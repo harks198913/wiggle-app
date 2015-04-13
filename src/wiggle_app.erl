@@ -24,6 +24,7 @@ start(_StartType, _StartArgs) ->
     load_schemas(),
     case application:get_env(wiggle, http_server, true) of
         true ->
+            application:start(folsom),
             {ok, Port} = application:get_env(wiggle, port),
             {ok, Compression} = application:get_env(wiggle, compression),
             {ok, Acceptors} = application:get_env(wiggle, acceptors),
