@@ -14,9 +14,6 @@
 %% ===================================================================
 
 start(_StartType, _StartArgs) ->
-    {ok, Port} = application:get_env(wiggle, port),
-    {ok, Compression} = application:get_env(wiggle, compression),
-    {ok, Acceptors} = application:get_env(wiggle, acceptors),
     case (catch eplugin:wait_for_init()) of
         {'EXIT', Why} ->
             lager:warning("Error waiting for eplugin init: ~p", [Why]),
@@ -27,6 +24,9 @@ start(_StartType, _StartArgs) ->
     load_schemas(),
     case application:get_env(wiggle, http_server, true) of
         true ->
+            {ok, Port} = application:get_env(wiggle, port),
+            {ok, Compression} = application:get_env(wiggle, compression),
+            {ok, Acceptors} = application:get_env(wiggle, acceptors),
             DPRules = dispatchs(),
             Dispatch = cowboy_router:compile([{'_', DPRules}]),
 
