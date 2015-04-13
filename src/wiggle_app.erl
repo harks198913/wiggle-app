@@ -34,7 +34,7 @@ start(_StartType, _StartArgs) ->
                                         [{compress, Compression},
                                          {env, [{dispatch, Dispatch}]}]),
             case application:get_env(wiggle, ssl) of
-                {ok, true} ->
+                {ok, on} ->
                     {ok, SSLPort} = application:get_env(wiggle, ssl_port),
                     {ok, SSLCA} = application:get_env(wiggle, ssl_cacertfile),
                     {ok, SSLCert} = application:get_env(wiggle, ssl_certfile),

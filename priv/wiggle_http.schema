@@ -1,0 +1,59 @@
+%% -*- erlang -*-
+
+%% @doc HTTP server reated settings for Wiggle
+
+
+%% @doc Selects wich portion of the API to expose.
+%%
+%% * all - expose the entire API.
+%% * snarl - exposes the Snarl related API (Sniffle is needed).
+%% * oauth2 - exposes only the OAuth2 endpoints no usermanagement or other
+%%   portions.
+{mapping, "api", "wiggle.api",
+ [{default, all},
+  {datatype, {enum, [all, snarl, oauth2]}}]}.
+
+%% @doc Enable or disable compression
+{mapping, "compression", "wiggle.compression",
+ [{default, on},
+  {datatype, flag}]}.
+
+%% @doc The port wiggle listens to.
+{mapping, "port", "wiggle.port",
+ [{default, 8080},
+  {datatype, integer}]}.
+
+%% @doc Enable or disable SSL compression
+{mapping, "ssl", "wiggle.ssl",
+ [{default, on},
+  {datatype, {enum, [on, off, spdy]}}]}.
+
+%% @doc The port wiggle listens to.
+{mapping, "ssl.port", "wiggle.ssl_port",
+ [{default, 8443},
+  {datatype, integer}]}.
+
+%% @doc The SSL CA certificate.
+{mapping, "ssl.cacertfile", "wiggle.ssl_cacertfile",
+ [{default, "/var/db/fifo/fifo.crt"},
+  {datatype, string}]}.
+
+%% @doc The SSL Server certificate
+{mapping, "ssl.certfile", "wiggle.ssl_certfile",
+ [{default, "/var/db/fifo/fifo.pem"},
+  {datatype, string}]}.
+
+%% @doc The SSL Key file
+{mapping, "ssl.keyfile", "wiggle.ssl_keyfile",
+ [{default, "/var/db/fifo/fifo.key"},
+  {datatype, string}]}.
+
+%% @doc Number of acceptor processes that are keeped ready
+{mapping, "acceptors", "wiggle.acceptors",
+ [{default, 100},
+  {datatype, integer}]}.
+
+%% @doc The TCP IP that mdns messages arrive to.
+{mapping, "listening_ip", "mdns_client_lib.interface",
+ [{default, "127.0.0.1"},
+  {datatype, string}]}.
