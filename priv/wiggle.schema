@@ -23,8 +23,8 @@
 %%   anew.
 
 {mapping, "standalone", "wiggle.standalone",
-  [{default, true},
-   {datatype, {flag, yes, no}},
+  [{default, yes},
+   {datatype, flag},
    hidden]}.
 
 %% @doc The TCP IP that mdns messages arrive to.
