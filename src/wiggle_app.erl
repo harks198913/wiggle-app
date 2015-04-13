@@ -14,9 +14,6 @@
 %% ===================================================================
 
 start(_StartType, _StartArgs) ->
-    {ok, Port} = application:get_env(wiggle, port),
-    {ok, Compression} = application:get_env(wiggle, compression),
-    {ok, Acceptors} = application:get_env(wiggle, acceptors),
     case (catch eplugin:wait_for_init()) of
         {'EXIT', Why} ->
             lager:warning("Error waiting for eplugin init: ~p", [Why]),
@@ -25,8 +22,12 @@ start(_StartType, _StartArgs) ->
         ok -> ok
     end,
     load_schemas(),
-    case application:get_env(wiggle, standalone, true) of
+    case application:get_env(wiggle, http_server, true) of
         true ->
+            application:start(folsom),
+            {ok, Port} = application:get_env(wiggle, port),
+            {ok, Compression} = application:get_env(wiggle, compression),
+            {ok, Acceptors} = application:get_env(wiggle, acceptors),
             DPRules = dispatchs(),
             Dispatch = cowboy_router:compile([{'_', DPRules}]),
 
@@ -34,7 +35,7 @@ start(_StartType, _StartArgs) ->
                                         [{compress, Compression},
                                          {env, [{dispatch, Dispatch}]}]),
             case application:get_env(wiggle, ssl) of
-                {ok, true} ->
+                {ok, on} ->
                     {ok, SSLPort} = application:get_env(wiggle, ssl_port),
                     {ok, SSLCA} = application:get_env(wiggle, ssl_cacertfile),
                     {ok, SSLCert} = application:get_env(wiggle, ssl_certfile),
@@ -91,21 +92,14 @@ dispatchs() ->
     PluginDispatchs = eplugin:fold('wiggle:dispatchs', []),
     API = application:get_env(wiggle, api, all),
     %% OAuth related rules
-    case application:get_env(wiggle, ui_dir) of
-        {ok, UIDir} ->
-            [{"/", cowboy_static, {file, filename:join(UIDir, "index.html")}},
-             {"/[...]", cowboy_static, {dir, UIDir}}];
-        _ ->
-            []
-    end ++
-        [{<<"/api/:version/oauth/token">>,
-          wiggle_oauth_token, []},
-         {<<"/api/:version/oauth/auth">>,
-          wiggle_oauth_auth, []},
-         {<<"/api/:version/oauth/2fa">>,
-          wiggle_oauth_2fa, []},
-         {<<"/api/:version/sessions/[...]">>,
-          wiggle_rest_handler, [wiggle_session_handler]}] ++
+    [{<<"/api/:version/oauth/token">>,
+      wiggle_oauth_token, []},
+     {<<"/api/:version/oauth/auth">>,
+      wiggle_oauth_auth, []},
+     {<<"/api/:version/oauth/2fa">>,
+      wiggle_oauth_2fa, []},
+     {<<"/api/:version/sessions/[...]">>,
+      wiggle_rest_handler, [wiggle_session_handler]}] ++
         %% Snarl related rules (we only exclude them if oauth is selected)
         case API of
             oauth2 ->
@@ -150,4 +144,11 @@ dispatchs() ->
             _ ->
                 []
         end ++
-        PluginDispatchs.
+        PluginDispatchs ++
+        case application:get_env(wiggle, ui_path) of
+            {ok, UIDir} ->
+                [{"/", cowboy_static, {file, filename:join(UIDir, "index.html")}},
+                 {"/[...]", cowboy_static, {dir, UIDir}}];
+            _ ->
+                []
+        end.
