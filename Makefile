@@ -19,7 +19,7 @@ version:
 version_header: version
 	@echo "-define(VERSION, <<\"$(shell cat wiggle.version)\">>)." > include/wiggle_version.hrl
 
-compile: version_header
+compile:
 	$(REBAR) compile
 
 deps:
