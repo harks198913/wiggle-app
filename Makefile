@@ -1,14 +1,14 @@
 REBAR = $(shell pwd)/rebar
 
-.PHONY: deps rel stagedevrel version
+.PHONY: deps version
 
-all: cp-hooks deps compile
+all: .git/hooks/pre-commit deps compile
 
-cp-hooks:
-	cp hooks/* .git/hooks
+.git/hooks/pre-commit: hooks/pre-commit
+	cp hooks/pre-commit .git/hooks
 
 quick-xref:
-	$(REBAR) xref skip_deps=true -r
+	$(REBAR) xref skip_deps=true
 
 quick-test:
 	$(REBAR) skip_deps=true eunit
@@ -17,7 +17,7 @@ version:
 	@echo "$(shell git symbolic-ref HEAD 2> /dev/null | cut -b 12-)-$(shell git log --pretty=format:'%h, %ad' -1)" > wiggle.version
 
 version_header: version
-	@echo "-define(VERSION, <<\"$(shell cat wiggle.version)\">>)." > apps/wiggle/src/wiggle_version.hrl
+	@echo "-define(VERSION, <<\"$(shell cat wiggle.version)\">>)." > include/wiggle_version.hrl
 
 compile: version_header
 	$(REBAR) compile
@@ -27,31 +27,17 @@ deps:
 
 clean:
 	$(REBAR) clean
-	[ -d apps/wiggle/ebin] && rm -r apps/wiggle/ebin || true
-	make -C rel/pkg clean
+	[ -d ebin ] && rm -r ebin || true
 
-distclean: clean devclean relclean
+distclean: clean devclean
 	$(REBAR) delete-deps
 
 test: all
 	$(REBAR) skip_deps=true xref -r
 	$(REBAR) skip_deps=true eunit
 
-rel: all zabbix
-	-rm -r rel/wiggle/share
-	$(REBAR) generate
-
-relclean:
-	rm -rf rel/wiggle
-
-package: rel
-	make -C rel/pkg package
-
 console: all
-	erl -pa deps/*/ebin apps/*/ebin -s wiggle -config standalone.config
-
-zabbix:
-	sh generate_zabbix_template.sh
+	erl -pa deps/*/ebin ebin -s wiggle -config standalone.config
 
 ###
 ### Docs
@@ -66,9 +52,6 @@ docs:
 xref: compile
 	@$(REBAR) xref skip_deps=true -r
 
-stage : rel
-	$(foreach dep,$(wildcard deps/* wildcard apps/*), rm -rf rel/wiggle/lib/$(shell basename $(dep))-* && ln -sf $(abspath $(dep)) rel/wiggle/lib;)
-
 ##
 ## Dialyzer
 ##
@@ -78,11 +61,11 @@ COMBO_PLT = $(HOME)/.wiggle_combo_dialyzer_plt
 
 check_plt: deps compile
 	dialyzer --check_plt --plt $(COMBO_PLT) --apps $(APPS) \
-		deps/*/ebin apps/*/ebin
+		deps/*/ebin ebin
 
 build_plt: deps compile
 	dialyzer --build_plt --output_plt $(COMBO_PLT) --apps $(APPS) \
-		deps/*/ebin apps/*/ebin
+		deps/*/ebin ebin
 
 dialyzer: deps compile
 	@echo
@@ -90,7 +73,7 @@ dialyzer: deps compile
 	@echo Use "'make build_plt'" to build PLT prior to using this target.
 	@echo
 	@sleep 1
-	dialyzer -Wno_return --plt $(COMBO_PLT) deps/*/ebin apps/*/ebin | grep -v -f dialyzer.mittigate
+	dialyzer -Wno_return --plt $(COMBO_PLT) deps/*/ebin ebin | grep -v -f dialyzer.mittigate
 
 
 cleanplt:
