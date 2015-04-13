@@ -1,7 +1,7 @@
 %% -*- erlang -*-
 
 {mapping, "http_server", "wiggle.http_server",
-  [{default, yes},
+  [{default, on},
    {datatype, flag},
    hidden]}.
 
