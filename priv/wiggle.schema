@@ -1,8 +1,8 @@
 %% -*- erlang -*-
 
-{mapping, "standalone", "wiggle.standalone",
+{mapping, "http_server", "wiggle.http_server",
   [{default, yes},
-   {datatype, {flag, yes, no}},
+   {datatype, flag},
    hidden]}.
 
 %% @doc If the ui_path is specified the content of this path will
