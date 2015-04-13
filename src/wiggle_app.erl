@@ -91,7 +91,7 @@ dispatchs() ->
     PluginDispatchs = eplugin:fold('wiggle:dispatchs', []),
     API = application:get_env(wiggle, api, all),
     %% OAuth related rules
-    case application:get_env(wiggle, ui_dir) of
+    case application:get_env(wiggle, ui_path) of
         {ok, UIDir} ->
             [{"/", cowboy_static, {file, filename:join(UIDir, "index.html")}},
              {"/[...]", cowboy_static, {dir, UIDir}}];

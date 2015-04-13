@@ -1,31 +1,16 @@
 %% -*- erlang -*-
 
-%% @doc Wiggle allows caching of objects, please be aware
-%% that caching data will increase the chacne of stale data.
-%% However it can increase performance significantly. Different
-%% objects have different 'lifetimes' so different timeouts
-%% apply. Setting the timeout to 0 will disable caching.
-%%
-%% However stale data served by wiggle does NOT mean stale data
-%% within FiFo.
-%%
-%% Wiggle will automatically invalidate the cache when a action is taken
-%% that means when someone changes a setting it should be directy reflectd.
-%%
-%% A two tier cache is used and works the following way:
-%%
-%% * Items requested within the timeframe of the L1 TTL will be served
-%%   directly from the cache.
-%% * Items requested within the timeframe of the L2 TTL are served
-%%   from the cache once but invalidated and the cache asyncrounously
-%%   updated.
-%% * Itemsrequested after the L2 TTL are invalidated emediately and fetched
-%%   anew.
 
 {mapping, "standalone", "wiggle.standalone",
   [{default, yes},
    {datatype, flag},
    hidden]}.
+
+%% @doc If the ui_path is specified the content of this path will
+%% be served at the root directory.
+{mapping, "ui_path", "wiggle.ui_path",
+  [{commented, "/opt/local/fifo-jingles/dist"},
+   {datatype, path}]}.
 
 %% @doc The TCP IP that mdns messages arrive to.
 {mapping, "listening_ip", "mdns_client_lib.interface",
