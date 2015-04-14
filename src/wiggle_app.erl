@@ -109,8 +109,8 @@ dispatchs() ->
                   wiggle_rest_handler, [wiggle_user_handler]},
                  {<<"/api/:version/roles/[...]">>,
                   wiggle_rest_handler, [wiggle_role_handler]},
-                 %% {<<"/api/:version/clients/[...]">>,
-                 %%  wiggle_rest_handler, [wiggle_client_handler]},
+                 {<<"/api/:version/clients/[...]">>,
+                  wiggle_rest_handler, [wiggle_client_handler]},
                  {<<"/api/:version/orgs/[...]">>,
                   wiggle_rest_handler, [wiggle_org_handler]}]
         end ++
