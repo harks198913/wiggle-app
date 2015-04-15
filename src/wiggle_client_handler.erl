@@ -1,6 +1,14 @@
-%% Feel free to use, reuse and abuse the code in this file.
+%% {
+%%   "client_id":"Client1",
+%%   "metadata":{},
+%%   "name":"This Cool Test Client",
+%%   "permissions":[],
+%%   "redirect_uris":["http://client.uri","https://developers.google.com/oauthplayground"],
+%%   "roles":[],
+%%   "type":"public",
+%%   "uuid":"308f8590-bc66-4f6c-bec5-2ff0c01d063c"
+%% }
 
-%% @doc Hello world handler.
 -module(wiggle_client_handler).
 -include("wiggle.hrl").
 
