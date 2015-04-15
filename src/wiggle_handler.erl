@@ -12,7 +12,8 @@
          options/3,
          service_available/0,
          encode/2,
-         get_persmissions/1,
+         get_permissions/1,
+         clear_permissions/1,
          timeout_cache_with_invalid/6,
          timeout_cache/5,
          scope_perms/2,
@@ -30,7 +31,7 @@ allowed(State=#state{scope_perms = SP}, Permission) ->
 allowed_tkn(_Permission, #state{token = undefined}) ->
     false;
 allowed_tkn(Perm, #state{token = Token}) ->
-    case get_persmissions(Token) of
+    case get_permissions(Token) of
         not_found ->
             lager:warning("[auth] unknown Token for allowed: ~p", [Token]),
             true;
@@ -248,11 +249,14 @@ service_available() ->
     end.
 
 %% Cache user permissions for up to 1s.
-get_persmissions(Token) ->
+get_permissions(Token) ->
     {TTL1, TTL2} = application:get_env(wiggle, token_ttl,
                                        {1000*1000, 10*1000*1000}),
     timeout_cache_(permissions, Token, TTL1, TTL2,
                    fun () -> ls_user:cache(Token) end).
+
+clear_permissions(#state{token = Token}) ->
+        e2qc:evict(permissions, token).
 
 timeout_cache(Cache, Value, TTL1, TTL2, Fun) ->
     case application:get_env(wiggle, caching, true) of

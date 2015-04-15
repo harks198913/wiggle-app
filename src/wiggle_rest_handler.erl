@@ -243,7 +243,9 @@ write1(Req, State = #state{body = Data}) ->
 write2(Req, State = #state{module = M, body = Data}) ->
     case cowboy_req:method(Req) of
         {<<"POST">>, Req1} ->
-            M:create(Req1, State, Data);
+            R = M:create(Req1, State, Data),
+            wiggle_handler:clear_permissions(State),
+            R;
         {<<"PUT">>, Req1} ->
             M:write(Req1, State, Data)
     end.
