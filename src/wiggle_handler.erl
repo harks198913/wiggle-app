@@ -256,7 +256,7 @@ get_permissions(Token) ->
                    fun () -> ls_user:cache(Token) end).
 
 clear_permissions(#state{token = Token}) ->
-        e2qc:evict(permissions, token).
+        e2qc:evict(permissions, Token).
 
 timeout_cache(Cache, Value, TTL1, TTL2, Fun) ->
     case application:get_env(wiggle, caching, true) of
