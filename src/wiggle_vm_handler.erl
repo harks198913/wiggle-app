@@ -377,7 +377,7 @@ schema(_State) ->
 
 read(Req, State = #state{token = Token, path = [], full_list=FullList, full_list_fields=Filter}) ->
     Start = now(),
-    {ok, Permissions} = wiggle_handler:get_persmissions(Token),
+    {ok, Permissions} = wiggle_handler:get_permissions(Token),
     ?MSnarl(?P(State), Start),
     Start1 = now(),
     Permission = [{must, 'allowed',
