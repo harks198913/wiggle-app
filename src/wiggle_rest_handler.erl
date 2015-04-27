@@ -179,11 +179,11 @@ forbidden(Req, State = #state{module = M}) ->
             {false, Req, State};
         {multiple, Permissions} ->
             R = lists:foldl(fun(Permission, Acc) ->
-                                    Acc orelse wiggle_handler:allowed(State, Permission)
+                                    Acc andalso wiggle_handler:allowed(State, Permission)
                             end, false, Permissions),
-            {R, Req, State};
+            {not R, Req, State};
         {ok, Permission} ->
-            {wiggle_handler:allowed(State, Permission), Req, State}
+            {not wiggle_handler:allowed(State, Permission), Req, State}
     end.
 
 %%--------------------------------------------------------------------

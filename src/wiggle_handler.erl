@@ -34,9 +34,9 @@ allowed_tkn(Perm, #state{token = Token}) ->
     case get_permissions(Token) of
         not_found ->
             lager:warning("[auth] unknown Token for allowed: ~p", [Token]),
-            true;
+            false;
         {ok, Ps} ->
-            not libsnarl:test(Perm, Ps)
+            libsnarl:test(Perm, Ps)
     end.
 
 initial_state(Req) ->
@@ -153,7 +153,8 @@ resolve_bearer(State = #state{bearer = Bearer}, Req) ->
                     SPerms = scope_perms(ls_oauth:scope(Scope), []),
                     {State#state{token = UUID, scope_perms = SPerms}, Req}
             end;
-        _ ->
+        E ->
+            lager:warning("[oauth] could not resolve bearer: ~p", [E]),
             {State, Req}
     end.
 
