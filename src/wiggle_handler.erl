@@ -29,6 +29,7 @@ allowed(State=#state{scope_perms = SP}, Permission) ->
     R.
 
 allowed_tkn(_Permission, #state{token = undefined}) ->
+    lager:warning("[auth] no Token for allowed.", []),
     false;
 allowed_tkn(Perm, #state{token = Token}) ->
     case get_permissions(Token) of
@@ -160,7 +161,7 @@ resolve_bearer(State = #state{bearer = Bearer}, Req) ->
 
 scope_perms([], Acc) ->
     lists:usort(Acc);
-scope_perms([{_, _, Perms} | R], Acc) ->
+scope_perms([{_, _, _, Perms} | R], Acc) ->
     scope_perms(R, Acc ++ Perms).
 
 full_list(Req) ->
