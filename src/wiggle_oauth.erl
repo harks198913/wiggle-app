@@ -46,14 +46,22 @@ json_error_response(Error, Req) ->
     cowboy_req:reply(Code, H1, ErrorBin, Req).
 
 redirected_error_response(Uri, Error, undefined, Req) ->
-    Params = [{<<"error">>, atom_to_binary(Error, utf8)}],
+    Params = [{<<"error">>, error_bin(Error)}],
     Location = <<Uri/binary, "?", (cow_qs:qs(Params))/binary>>,
     cowboy_req:reply(302, [{<<"location">>, Location}], <<>>, Req);
 
 redirected_error_response(Uri, Error, State, Req) ->
-    Params = [{<<"error">>, atom_to_binary(Error, utf8)}, {<<"state">>, State}],
+    Params = [{<<"error">>, error_bin(Error)}, {<<"state">>, State}],
     Location = <<Uri/binary, "?", (cow_qs:qs(Params))/binary>>,
     cowboy_req:reply(302, [{<<"location">>, Location}], <<>>, Req).
+
+error_bin({error, E}) when is_atom(E) ->
+    atom_to_binary(E, utf8);
+error_bin(E) when is_atom(E) ->
+    atom_to_binary(E, utf8);
+error_bin(_) ->
+    <<"argh!">>.
+
 
 
 access_refresh_token_response(AccessToken, Type, Expires, RefreshToken, Scope,
@@ -147,7 +155,7 @@ errod_description(temporarily_unavailable) ->
 
 errod_description(Error) ->
     {<<"server_error">>,
-     <<"An unknown error occourd: ", (atom_to_binary(Error, utf8))/binary>>}.
+     <<"An unknown error occourd: ", (error_bin(Error))/binary>>}.
 
 decode_grant_type(<<"password">>) ->
     password;

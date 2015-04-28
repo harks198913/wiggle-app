@@ -178,12 +178,17 @@ forbidden(Req, State = #state{module = M}) ->
         {ok, always} ->
             {false, Req, State};
         {multiple, Permissions} ->
-            R = lists:foldl(fun(Permission, Acc) ->
-                                    Acc orelse wiggle_handler:allowed(State, Permission)
-                            end, false, Permissions),
-            {R, Req, State};
+            R = lists:foldl(fun(_, false) ->
+                                    %% We can just keep returning false once we
+                                    %% got the first false given false and *
+                                    %% will always return false.
+                                    false;
+                               (Permission, Acc) ->
+                                    Acc andalso wiggle_handler:allowed(State, Permission)
+                            end, true, Permissions),
+            {not R, Req, State};
         {ok, Permission} ->
-            {wiggle_handler:allowed(State, Permission), Req, State}
+            {not wiggle_handler:allowed(State, Permission), Req, State}
     end.
 
 %%--------------------------------------------------------------------
