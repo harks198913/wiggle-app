@@ -7,5 +7,5 @@
 
 {mapping, "folsom_ddb.prefix", "folsom_ddb.prefix", [
     merge,
-    {default, "wiggle"}
+    {default, "wiggle@127.0.0.1"}
 ]}.
