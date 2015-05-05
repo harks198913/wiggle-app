@@ -196,12 +196,21 @@ accepted() ->
 
 media_type(Req) ->
     case cowboy_req:meta(media_type, Req) of
+        %%   application/       x-msgpack
         {{<<"application">>, <<"x-msgpack">>, _}, Req1} ->
             {msgpack, Req1};
         {{<<"application">>, <<"json">>, _}, Req1} ->
             {json, Req1};
-        {_, Req1} ->
-            {json, Req1}
+        {undefined, Req1} ->
+            case cowboy_req:header(<<"accept-encoding">>, Req1) of
+                {<<"application/x-msgpack">>, Req2} ->
+                    {msgpack, Req2};
+                {<<"application/json">>, Req2} ->
+                    {json, Req2};
+                {Oops, Req1} ->
+                    lager:warning("[media_type] Unknown media_type: ~p", [Oops]),
+                    {json, Req1}
+            end
     end.
 
 decode(Req) ->
