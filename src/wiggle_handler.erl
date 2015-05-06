@@ -259,12 +259,12 @@ service_available() ->
             true
     end.
 
-%% Cache user permissions for up to 1s.
+%% Cache user permissions for up to 1s (no refresh on 100ms)
 get_permissions(Token) ->
     {TTL1, TTL2} = application:get_env(wiggle, token_ttl,
-                                       {1000*1000, 10*1000*1000}),
-    timeout_cache_(permissions, Token, TTL1, TTL2,
-                   fun () -> ls_user:cache(Token) end).
+                                       {1000*100, 1000*1000}),
+    timeout_cache(permissions, Token, TTL1, TTL2,
+                  fun () -> ls_user:cache(Token) end).
 
 clear_permissions(#state{token = Token}) ->
         e2qc:evict(permissions, Token).
