@@ -850,12 +850,18 @@ delete(Req, State = #state{path = [?UUID(Vm), <<"hypervisor">>]}) ->
 
 delete(Req, State = #state{path = [?UUID(Vm)]}) ->
     Start = now(),
-    ok = ls_vm:delete(user(State), Vm),
-    e2qc:evict(?CACHE, Vm),
-    e2qc:teardown(?LIST_CACHE),
-    e2qc:teardown(?FULL_CACHE),
-    ?MSniffle(?P(State), Start),
-    {true, Req, State};
+    case ls_vm:delete(user(State), Vm) of
+        ok ->
+            e2qc:evict(?CACHE, Vm),
+            e2qc:teardown(?LIST_CACHE),
+            e2qc:teardown(?FULL_CACHE),
+            ?MSniffle(?P(State), Start),
+            {true, Req, State};
+        {error, locked} ->
+            {ok, Req1} = cowboy_req:reply(423, Req),
+            lager:error("Could not delete: locked"),
+            {halt, Req1, State}
+    end;
 
 delete(Req, State = #state{path = [?UUID(Vm), <<"metadata">> | Path]}) ->
     Start = now(),
