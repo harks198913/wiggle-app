@@ -857,7 +857,7 @@ delete(Req, State = #state{path = [?UUID(Vm)]}) ->
             e2qc:teardown(?FULL_CACHE),
             ?MSniffle(?P(State), Start),
             {true, Req, State};
-        {error, locked} ->
+        {error,creating} ->
             {ok, Req1} = cowboy_req:reply(423, Req),
             lager:error("Could not delete: locked"),
             {halt, Req1, State}
