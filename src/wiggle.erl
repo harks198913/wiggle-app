@@ -11,7 +11,6 @@ start() ->
     application:start(libsnarlmatch),
     application:start(libchunter),
     application:start(libsnarl),
-    application:start(libhowl),
     application:start(libsniffle),
     application:start(jsx),
     application:start(lager),

@@ -43,13 +43,9 @@ connections(["snarl"]) ->
     io:format("Snarl endpoints.~n"),
     print_endpoints(libsnarl:servers());
 
-connections(["howl"]) ->
-    io:format("Howl endpoints.~n"),
-    print_endpoints(libhowl:servers());
-
 connections(["sniffle"]) ->
     io:format("Sniffle endpoints.~n"),
-    print_endpoints(libhowl:servers());
+    print_endpoints(libsniffle:servers());
 
 connections([]) ->
     connections(["sniffle"]),

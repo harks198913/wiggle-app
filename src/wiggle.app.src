@@ -10,7 +10,6 @@
                   ensq_rpc,
                   libsnarl,
                   libsniffle,
-                  libhowl,
                   libchunter,
                   jsx,
                   jesse,
