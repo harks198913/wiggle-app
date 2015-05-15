@@ -53,7 +53,6 @@ read(Req, State = #state{path = []}) ->
                            {<<"message">>, <<"The Snarl subsystem could not be reached.">>}
                           ]]}
         end,
-    {Versions2, Metrics2, Warnings2} =
     {Versions3, Metrics3, Warnings3} =
         case {libsniffle:version(), libsniffle:cloud_status()} of
             {{ok, SniVer}, {ok, {MetricsSni, WarningsSni}}}
