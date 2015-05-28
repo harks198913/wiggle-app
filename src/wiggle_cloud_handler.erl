@@ -37,8 +37,7 @@ permission_required(_State) ->
 read(Req, State = #state{path = [<<"connection">>]}) ->
     Res = [
            {<<"sniffle">>, length(libsniffle:servers())},
-           {<<"snarl">>, length(libsnarl:servers())},
-           {<<"howl">>, length(libhowl:servers())}
+           {<<"snarl">>, length(libsnarl:servers())}
           ],
     {Res, Req, State};
 
@@ -54,29 +53,19 @@ read(Req, State = #state{path = []}) ->
                            {<<"message">>, <<"The Snarl subsystem could not be reached.">>}
                           ]]}
         end,
-    {Versions2, Metrics2, Warnings2} =
-        case libhowl:version() of
-            {ok, HowlVer} when is_binary(HowlVer) ->
-                {[{howl, HowlVer} | Versions1], Metrics1, Warnings1};
-            _ ->
-                {Versions1, Metrics1, [[{<<"category">>, <<"howl">>},
-                                        {<<"element">>, <<"all">>},
-                                        {<<"message">>, <<"The Howl subsystem could not be reached.">>}
-                                       ] | Warnings1]}
-        end,
     {Versions3, Metrics3, Warnings3} =
         case {libsniffle:version(), libsniffle:cloud_status()} of
             {{ok, SniVer}, {ok, {MetricsSni, WarningsSni}}}
               when is_binary(SniVer) ->
-                {[{sniffle, SniVer} | Versions2],
-                 MetricsSni ++ Metrics2,
-                 WarningsSni ++ Warnings2};
+                {[{sniffle, SniVer} | Versions1],
+                 MetricsSni ++ Metrics1,
+                 WarningsSni ++ Warnings1};
             _ ->
-                {Versions2, Metrics2,
+                {Versions1, Metrics1,
                  [[{<<"category">>, <<"sniffle">>},
                    {<<"element">>, <<"all">>},
                    {<<"message">>, <<"The Sniffle subsystem could not be reached.">>}
-                  ] | Warnings2]}
+                  ] | Warnings1]}
         end,
     {[{versions, [{wiggle, ?VERSION} | Versions3]},
       {metrics,  Metrics3},
