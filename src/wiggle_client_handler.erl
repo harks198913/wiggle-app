@@ -102,8 +102,8 @@ read(Req, State = #state{path = [_Client], obj = ClientObj}) ->
 %%--------------------------------------------------------------------
 
 create(Req, State = #state{token = Token, path = [], version = Version}, Decoded) ->
-    {ok, Creator} = ls_client:get(Token),
-    CUUID = ft_client:uuid(Creator),
+    {ok, Creator} = ls_user:get(Token),
+    CUUID = ft_user:uuid(Creator),
     {ok, Client} = jsxd:get(<<"client">>, Decoded),
     {ok, Pass} = jsxd:get(<<"secret">>, Decoded),
     Start = now(),

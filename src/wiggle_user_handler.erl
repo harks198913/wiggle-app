@@ -48,7 +48,7 @@ allowed_methods(_Version, _Token, [?UUID(_User), <<"permissions">>]) ->
     [<<"GET">>];
 
 allowed_methods(_Version, _Token, [?UUID(_User), <<"permissions">> | _Permission]) ->
-    [<<"PUT">>, <<"DELETE">>];
+    [<<"PUT">>, <<"DELETE">>, <<"GET">>];
 
 allowed_methods(_Version, _Token, [?UUID(_User), <<"roles">>]) ->
     [<<"GET">>];
@@ -61,6 +61,14 @@ allowed_methods(_Version, _Token, [?UUID(_User), <<"orgs">>]) ->
 
 allowed_methods(_Version, _Token, [?UUID(_User), <<"orgs">>, _Org]) ->
     [<<"PUT">>, <<"DELETE">>].
+
+
+%% If we GET on a permission we don't want to know if the user has THIS
+%% exact permission, we're fine knowing that he exists, this is used to
+%% perform permission checks this way.
+get(State = #state{method = <<"GET">>,
+                   path = [?UUID(User), <<"permissions">> | _]}) ->
+    wiggle_user_handler:get(State#state{path = [?UUID(User)]});
 
 get(State = #state{path = [?UUID(User), <<"permissions">> | Permission]}) ->
     case {Permission,
@@ -137,7 +145,7 @@ permission_required(#state{method = <<"DELETE">>, path = [?UUID(User)]}) ->
     {ok, [<<"users">>, User, <<"delete">>]};
 
 permission_required(#state{method = <<"GET">>,
-                           path = [?UUID(User), <<"permissions">>]}) ->
+                           path = [?UUID(User), <<"permissions">> | _]}) ->
     {ok, [<<"users">>, User, <<"get">>]};
 
 permission_required(#state{method = <<"PUT">>,
@@ -237,6 +245,20 @@ read(Req, State = #state{path = [_User], obj = UserObj}) ->
 
 read(Req, State = #state{path = [_User, <<"permissions">>], obj = UserObj}) ->
     {ft_user:permissions(UserObj), Req, State};
+
+read(Req, State = #state{path = [User, <<"permissions">> | Permission]}) ->
+    case wiggle_handler:get_permissions(User) of
+        not_found ->
+            {ok, Req1} = cowboy_req:reply(404, Req),
+            {halt, Req1, State};
+        {ok, Ps} ->
+            case libsnarl:test(Permission, Ps) of
+                true ->
+                    {[{<<"ok">>, <<"allowed">>}], Req, State};
+                false ->
+                    {[{<<"error">>, <<"forbidden">>}], Req, State}
+            end
+    end;
 
 read(Req, State = #state{path = [_User, <<"roles">>], obj = UserObj}) ->
     {ft_user:roles(UserObj), Req, State};
