@@ -742,7 +742,7 @@ write(Req, ?UPD1, [{<<"package">>, Package}]) ->
 
 %% 0.2.0
 write(Req, State = #state{path = [?UUID(Vm), <<"config">>], version = ?V2},
-      [{<<"config">>, Config}]) ->
+      Config) ->
     e2qc:evict(?CACHE, Vm),
     e2qc:teardown(?FULL_CACHE),
     ?LIB(ls_vm:update(user(State), Vm, undefined, Config));

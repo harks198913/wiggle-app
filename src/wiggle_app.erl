@@ -92,12 +92,13 @@ dispatchs() ->
     PluginDispatchs = eplugin:fold('wiggle:dispatchs', []),
     API = application:get_env(wiggle, api, all),
     %% OAuth related rules
-    [{<<"/api/:version/oauth/token">>,
-      wiggle_oauth_token, []},
+    [
+     {<<"/api/:version/oauth/token">>,
+      cowboy_oauth_token, [<<"/api/0.2.0/oauth/2fa">>]},
      {<<"/api/:version/oauth/auth">>,
-      wiggle_oauth_auth, []},
+      cowboy_oauth_auth, []},
      {<<"/api/:version/oauth/2fa">>,
-      wiggle_oauth_2fa, []},
+      cowboy_oauth_2fa, []},
      {<<"/api/:version/sessions/[...]">>,
       wiggle_rest_handler, [wiggle_session_handler]}] ++
         %% Snarl related rules (we only exclude them if oauth is selected)
