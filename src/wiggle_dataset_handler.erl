@@ -310,20 +310,18 @@ import_manifest(UUID, D1) ->
        {<<"description">>, fun ls_dataset:description/2},
        {<<"disk_driver">>, fun ls_dataset:disk_driver/2},
        {<<"nic_driver">>, fun ls_dataset:nic_driver/2},
-       {<<"users">>, fun ls_dataset:users/2}
+       {<<"users">>, fun ls_dataset:users/2},
+       {[<<"tags">>, <<"kernel_version">>], fun ls_dataset:kernel_version/2}
       ], UUID, D1),
     ls_dataset:image_size(
       UUID,
       ensure_integer(
         jsxd:get(<<"image_size">>,
                  jsxd:get([<<"files">>, 0, <<"size">>], 0, D1), D1))),
-    ls_dataset:sha1(
-      UUID,
-      jsxd:get(<<"sha1">>,
-               jsxd:get([<<"files">>, 0, <<"sha1">>], <<>>, D1), D1)),
-    [ls_dataset:add_network(UUID, {Name, Desc})  ||
-        [{<<"description">>, Desc}, {<<"name">>, Name}] <-
-            jsxd:get([<<"requirements">>, <<"networks">>], [], D1)],
+    RS = jsxd:get(<<"requirements">>, [], D1),
+    Networks = jsxd:get(<<"networks">>, [], RS),
+    [ls_dataset:add_network(UUID, {NName, NDesc}) ||
+        [{<<"description">>, NDesc}, {<<"name">>, NName}] <- Networks],
     case jsxd:get(<<"homepage">>, D1) of
         {ok, HomePage} ->
             ls_dataset:set_metadata(
@@ -332,13 +330,29 @@ import_manifest(UUID, D1) ->
         _ ->
             ok
     end,
+    case jsxd:get(<<"min_platform">>, RS) of
+        {ok, Min} ->
+            Min1 = [V || {_, V} <- Min],
+            [M | _] = lists:sort(Min1),
+            R = {must, '>=', <<"sysinfo.Live Image">>, M},
+            ls_dataset:add_requirement(UUID, R);
+        _ ->
+            ok
+    end,
     case jsxd:get(<<"os">>, D1) of
         {ok, <<"smartos">>} ->
-            ls_dataset:type(UUID, <<"zone">>),
-            ls_dataset:os(UUID, <<"smartos">>);
+            ls_dataset:os(UUID, <<"smartos">>),
+            ls_dataset:type(UUID, <<"zone">>);
         {ok, OS} ->
-            ls_dataset:type(UUID, <<"kvm">>),
-            ls_dataset:os(UUID, OS)
+            case jsxd:get(<<"type">>, D1) of
+                {ok, <<"lx-dataset">>} ->
+                    ls_dataset:os(UUID, OS),
+                    ls_dataset:type(UUID, <<"zone">>),
+                    ls_dataset:zone_type(UUID, <<"lx">>);
+                _ ->
+                    ls_dataset:os(UUID, OS),
+                    ls_dataset:type(UUID, <<"kvm">>)
+            end
     end.
 
 import_dataset(UUID, Idx, TotalSize, Req) ->
