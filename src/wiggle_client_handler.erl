@@ -36,6 +36,15 @@ allowed_methods(_Version, _Token, []) ->
 allowed_methods(_Version, _Token, [?UUID(_Client)]) ->
     [<<"GET">>, <<"PUT">>, <<"DELETE">>];
 
+allowed_methods(_Version, _Token, [?UUID(_Client), <<"permissions">> | _]) ->
+    [<<"PUT">>, <<"DELETE">>];
+
+allowed_methods(_Version, _Token, [?UUID(_Client), <<"uris">>]) ->
+    [<<"POST">>];
+
+allowed_methods(_Version, _Token, [?UUID(_Client), <<"uris">>, _]) ->
+    [ <<"DELETE">>];
+
 allowed_methods(_Version, _Token, [?UUID(_Client), <<"metadata">> | _]) ->
     [<<"PUT">>, <<"DELETE">>].
 
@@ -66,6 +75,22 @@ permission_required(#state{method = <<"PUT">>, path = [?UUID(Client)]}) ->
 
 permission_required(#state{method = <<"DELETE">>, path = [?UUID(Client)]}) ->
     {ok, [<<"clients">>, Client, <<"delete">>]};
+
+permission_required(#state{method = <<"PUT">>,
+                           path = [?UUID(Client), <<"permissions">> | _]}) ->
+    {ok, [<<"clients">>, Client, <<"grant">>]};
+
+permission_required(#state{method = <<"DELETE">>,
+                           path = [?UUID(Client), <<"permissions">> | _]}) ->
+    {ok, [<<"clients">>, Client, <<"revoke">>]};
+
+permission_required(#state{method = <<"POST">>,
+                           path = [?UUID(Client), <<"uris">>]}) ->
+    {ok, [<<"clients">>, Client, <<"edit">>]};
+
+permission_required(#state{method = <<"DELETE">>,
+                           path = [?UUID(Client), <<"urls">>, _]}) ->
+    {ok, [<<"clients">>, Client, <<"edit">>]};
 
 permission_required(#state{path = [?UUID(Client), <<"metadata">> | _]}) ->
     {ok, [<<"clients">>, Client, <<"edit">>]};
