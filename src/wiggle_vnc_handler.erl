@@ -68,7 +68,7 @@ websocket_init(_Any, Req, []) ->
                                                     Req4 = cowboy_req:compact(Req3),
                                                     {ok, Req4, {Socket}, hibernate};
                                                 E ->
-                                                    list_to_binary(io_lib:format("~p", [E]))
+                                                    e(500, list_to_binary(io_lib:format("~p", [E])), Req)
                                             end;
                                         _ ->
                                             e(404, <<"could not find vnc">>, Req3)

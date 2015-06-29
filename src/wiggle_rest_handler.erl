@@ -82,7 +82,7 @@ options(Req, State = #state{module = M}) ->
                                 State#state.path),
     wiggle_handler:options(Req, State,Methods).
 
-content_types_provided(Req, State = #state{module = M}) ->
+content_types_providezdd(Req, State = #state{module = M}) ->
     CTFun = case erlang:function_exported(M, content_types_provided, 1) of
                 true ->
                     fun M:content_types_provided/1;
