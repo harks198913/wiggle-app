@@ -44,7 +44,10 @@ allowed_methods(_Version, _Token, [?UUID(_Dataset), <<"dataset.gz">>]) ->
 allowed_methods(_Version, _Token, [?UUID(_Dataset), <<"dataset.bz2">>]) ->
     [<<"PUT">>, <<"GET">>];
 
-allowed_methods(_Version, _Token, [?UUID(_Dataset), <<"networks">>]) ->
+allowed_methods(<<"0.2.0">>, _Token, [?UUID(_Dataset), <<"networks">>, _]) ->
+    [<<"PUT">>, <<"DELETE">>];
+
+allowed_methods(<<"0.1.0">>, _Token, [?UUID(_Dataset), <<"networks">>]) ->
     [<<"PUT">>];
 
 allowed_methods(_Version, _Token, [?UUID(_Dataset), <<"metadata">>|_]) ->
@@ -97,7 +100,16 @@ permission_required(#state{method = <<"PUT">>, path = [?UUID(Dataset), <<"datase
 permission_required(#state{method = <<"DELETE">>, path = [?UUID(Dataset)]}) ->
     {ok, [<<"datasets">>, Dataset, <<"delete">>]};
 
-permission_required(#state{method = <<"PUT">>, path = [?UUID(Dataset), <<"networks">>]}) ->
+permission_required(#state{method = <<"PUT">>, version = <<"0.1.0">>,
+                           path = [?UUID(Dataset), <<"networks">>]}) ->
+    {ok, [<<"datasets">>, Dataset, <<"edit">>]};
+
+permission_required(#state{method = <<"PUT">>, version = <<"0.2.0">>,
+                           path = [?UUID(Dataset), <<"networks">>, _]}) ->
+    {ok, [<<"datasets">>, Dataset, <<"edit">>]};
+
+permission_required(#state{method = <<"DELETE">>, version = <<"0.1.0">>,
+                           path = [?UUID(Dataset), <<"networks">>, _]}) ->
     {ok, [<<"datasets">>, Dataset, <<"edit">>]};
 
 permission_required(#state{method = <<"PUT">>, path = [?UUID(Dataset), <<"metadata">> | _]}) ->
@@ -167,7 +179,7 @@ read(Req, State = #state{path = [UUID, <<"dataset.gz">>], obj = _Obj}) ->
     {{chunked, StreamFun}, Req, State}.
 
 %%--------------------------------------------------------------------
-%% PUT
+%% POST
 %%--------------------------------------------------------------------
 
 create(Req, State = #state{path = [UUID], version = Version}, Decoded) ->
@@ -202,6 +214,10 @@ create(Req, State = #state{path = [], version = Version}, Decoded) ->
             {{true, <<"/api/", Version/binary, "/datasets/", UUID/binary>>}, Req, State#state{body = Decoded}}
     end.
 
+%%--------------------------------------------------------------------
+%% PUT
+%%--------------------------------------------------------------------
+
 write(Req, State = #state{path = [UUID, <<"dataset.gz">>]}, _) ->
     case ls_dataset:get(UUID) of
         {ok, R} ->
@@ -221,7 +237,21 @@ write(Req, State = #state{path = [?UUID(Dataset), <<"metadata">> | Path]}, [{K, 
     ?MSniffle(?P(State), Start),
     {true, Req, State};
 
-write(Req, State = #state{path = [?UUID(Dataset), <<"networks">>]}, Data) ->
+write(Req, State = #state{path = [?UUID(Dataset), <<"networks">>, NIC],
+                          obj = Obj, version = <<"0.2.0">>},
+      [{<<"description">>, Desc}]) ->
+    Start = now(),
+    [ls_dataset:remove_nic(Dataset, E) || E = {_NIC, _} <- ft_dataset:nics(Obj),
+                                          _NIC =:= NIC],
+    ft_dataset:add_nic(Dataset, {NIC, Desc}),
+    e2qc:evict(?CACHE, Dataset),
+    e2qc:teardown(?FULL_CACHE),
+    ?MSniffle(?P(State), Start),
+    {true, Req, State};
+
+
+write(Req, State = #state{path = [?UUID(Dataset), <<"networks">>],
+                          version = <<"0.1.0">>}, Data) ->
     Start = now(),
     Nets =
         ordsets:from_list(
