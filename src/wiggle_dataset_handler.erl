@@ -44,7 +44,10 @@ allowed_methods(_Version, _Token, [?UUID(_Dataset), <<"dataset.gz">>]) ->
 allowed_methods(_Version, _Token, [?UUID(_Dataset), <<"dataset.bz2">>]) ->
     [<<"PUT">>, <<"GET">>];
 
-allowed_methods(_Version, _Token, [?UUID(_Dataset), <<"networks">>]) ->
+allowed_methods(<<"0.2.0">>, _Token, [?UUID(_Dataset), <<"networks">>, _]) ->
+    [<<"PUT">>, <<"DELETE">>];
+
+allowed_methods(<<"0.1.0">>, _Token, [?UUID(_Dataset), <<"networks">>]) ->
     [<<"PUT">>];
 
 allowed_methods(_Version, _Token, [?UUID(_Dataset), <<"metadata">>|_]) ->
@@ -97,7 +100,16 @@ permission_required(#state{method = <<"PUT">>, path = [?UUID(Dataset), <<"datase
 permission_required(#state{method = <<"DELETE">>, path = [?UUID(Dataset)]}) ->
     {ok, [<<"datasets">>, Dataset, <<"delete">>]};
 
-permission_required(#state{method = <<"PUT">>, path = [?UUID(Dataset), <<"networks">>]}) ->
+permission_required(#state{method = <<"PUT">>, version = <<"0.1.0">>,
+                           path = [?UUID(Dataset), <<"networks">>]}) ->
+    {ok, [<<"datasets">>, Dataset, <<"edit">>]};
+
+permission_required(#state{method = <<"PUT">>, version = <<"0.2.0">>,
+                           path = [?UUID(Dataset), <<"networks">>, _]}) ->
+    {ok, [<<"datasets">>, Dataset, <<"edit">>]};
+
+permission_required(#state{method = <<"DELETE">>, version = <<"0.1.0">>,
+                           path = [?UUID(Dataset), <<"networks">>, _]}) ->
     {ok, [<<"datasets">>, Dataset, <<"edit">>]};
 
 permission_required(#state{method = <<"PUT">>, path = [?UUID(Dataset), <<"metadata">> | _]}) ->
@@ -167,7 +179,7 @@ read(Req, State = #state{path = [UUID, <<"dataset.gz">>], obj = _Obj}) ->
     {{chunked, StreamFun}, Req, State}.
 
 %%--------------------------------------------------------------------
-%% PUT
+%% POST
 %%--------------------------------------------------------------------
 
 create(Req, State = #state{path = [UUID], version = Version}, Decoded) ->
@@ -202,6 +214,10 @@ create(Req, State = #state{path = [], version = Version}, Decoded) ->
             {{true, <<"/api/", Version/binary, "/datasets/", UUID/binary>>}, Req, State#state{body = Decoded}}
     end.
 
+%%--------------------------------------------------------------------
+%% PUT
+%%--------------------------------------------------------------------
+
 write(Req, State = #state{path = [UUID, <<"dataset.gz">>]}, _) ->
     case ls_dataset:get(UUID) of
         {ok, R} ->
@@ -221,7 +237,21 @@ write(Req, State = #state{path = [?UUID(Dataset), <<"metadata">> | Path]}, [{K, 
     ?MSniffle(?P(State), Start),
     {true, Req, State};
 
-write(Req, State = #state{path = [?UUID(Dataset), <<"networks">>]}, Data) ->
+write(Req, State = #state{path = [?UUID(Dataset), <<"networks">>, NIC],
+                          obj = Obj, version = <<"0.2.0">>},
+      [{<<"description">>, Desc}]) ->
+    Start = now(),
+    [ls_dataset:remove_nic(Dataset, E) || E = {_NIC, _} <- ft_dataset:nics(Obj),
+                                          _NIC =:= NIC],
+    ft_dataset:add_nic(Dataset, {NIC, Desc}),
+    e2qc:evict(?CACHE, Dataset),
+    e2qc:teardown(?FULL_CACHE),
+    ?MSniffle(?P(State), Start),
+    {true, Req, State};
+
+
+write(Req, State = #state{path = [?UUID(Dataset), <<"networks">>],
+                          version = <<"0.1.0">>}, Data) ->
     Start = now(),
     Nets =
         ordsets:from_list(
@@ -310,20 +340,18 @@ import_manifest(UUID, D1) ->
        {<<"description">>, fun ls_dataset:description/2},
        {<<"disk_driver">>, fun ls_dataset:disk_driver/2},
        {<<"nic_driver">>, fun ls_dataset:nic_driver/2},
-       {<<"users">>, fun ls_dataset:users/2}
+       {<<"users">>, fun ls_dataset:users/2},
+       {[<<"tags">>, <<"kernel_version">>], fun ls_dataset:kernel_version/2}
       ], UUID, D1),
     ls_dataset:image_size(
       UUID,
       ensure_integer(
         jsxd:get(<<"image_size">>,
                  jsxd:get([<<"files">>, 0, <<"size">>], 0, D1), D1))),
-    ls_dataset:sha1(
-      UUID,
-      jsxd:get(<<"sha1">>,
-               jsxd:get([<<"files">>, 0, <<"sha1">>], <<>>, D1), D1)),
-    [ls_dataset:add_network(UUID, {Name, Desc})  ||
-        [{<<"description">>, Desc}, {<<"name">>, Name}] <-
-            jsxd:get([<<"requirements">>, <<"networks">>], [], D1)],
+    RS = jsxd:get(<<"requirements">>, [], D1),
+    Networks = jsxd:get(<<"networks">>, [], RS),
+    [ls_dataset:add_network(UUID, {NName, NDesc}) ||
+        [{<<"description">>, NDesc}, {<<"name">>, NName}] <- Networks],
     case jsxd:get(<<"homepage">>, D1) of
         {ok, HomePage} ->
             ls_dataset:set_metadata(
@@ -332,13 +360,29 @@ import_manifest(UUID, D1) ->
         _ ->
             ok
     end,
+    case jsxd:get(<<"min_platform">>, RS) of
+        {ok, Min} ->
+            Min1 = [V || {_, V} <- Min],
+            [M | _] = lists:sort(Min1),
+            R = {must, '>=', <<"sysinfo.Live Image">>, M},
+            ls_dataset:add_requirement(UUID, R);
+        _ ->
+            ok
+    end,
     case jsxd:get(<<"os">>, D1) of
         {ok, <<"smartos">>} ->
-            ls_dataset:type(UUID, <<"zone">>),
-            ls_dataset:os(UUID, <<"smartos">>);
+            ls_dataset:os(UUID, <<"smartos">>),
+            ls_dataset:type(UUID, <<"zone">>);
         {ok, OS} ->
-            ls_dataset:type(UUID, <<"kvm">>),
-            ls_dataset:os(UUID, OS)
+            case jsxd:get(<<"type">>, D1) of
+                {ok, <<"lx-dataset">>} ->
+                    ls_dataset:os(UUID, OS),
+                    ls_dataset:type(UUID, <<"zone">>),
+                    ls_dataset:zone_type(UUID, <<"lx">>);
+                _ ->
+                    ls_dataset:os(UUID, OS),
+                    ls_dataset:type(UUID, <<"kvm">>)
+            end
     end.
 
 import_dataset(UUID, Idx, TotalSize, Req) ->

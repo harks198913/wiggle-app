@@ -7,11 +7,12 @@
          provided/0,
          accepted/0,
          decode/1,
+         decode/2,
          get_token/2,
          set_access_header/1,
          options/3,
          service_available/0,
-         encode/2,
+         encode/3,
          get_permissions/1,
          clear_permissions/1,
          timeout_cache_with_invalid/6,
@@ -184,38 +185,34 @@ full_list_fields(Req) ->
 
 provided() ->
     [
-     {{<<"application">>, <<"x-msgpack">>, []}, read},
-     {{<<"application">>, <<"json">>, []}, read}
+     {{<<"application">>, <<"x-msgpack">>, []}, read_msgpack},
+     {{<<"application">>, <<"json">>, []}, read_json}
     ].
 
 accepted() ->
     [
-     {{<<"application">>, <<"x-msgpack">>, '*'}, write},
-     {{<<"application">>, <<"json">>, '*'}, write}
+     {{<<"application">>, <<"x-msgpack">>, '*'}, write_msgpack},
+     {{<<"application">>, <<"json">>, '*'}, write_json}
     ].
 
-media_type(Req) ->
-    case cowboy_req:meta(media_type, Req) of
-        %%   application/       x-msgpack
-        {{<<"application">>, <<"x-msgpack">>, _}, Req1} ->
+content_type(Req) ->
+    case cowboy_req:header(<<"accept-encoding">>, Req) of
+        {<<"application/x-msgpack", _/binary>>, Req1} ->
             {msgpack, Req1};
-        {{<<"application">>, <<"json">>, _}, Req1} ->
+        {<<"application/json", _/binary>>, Req1} ->
             {json, Req1};
-        {undefined, Req1} ->
-            case cowboy_req:header(<<"accept-encoding">>, Req1) of
-                {<<"application/x-msgpack">>, Req2} ->
-                    {msgpack, Req2};
-                {<<"application/json">>, Req2} ->
-                    {json, Req2};
-                {Oops, Req1} ->
-                    lager:warning("[media_type] Unknown media_type: ~p", [Oops]),
-                    {json, Req1}
-            end
+        {Oops, Req1} ->
+            lager:warning("[content_type] Unknown media_type: ~p", [Oops]),
+            {json, Req1}
     end.
 
+
 decode(Req) ->
-    {ContentType, Req0} = media_type(Req),
-    {ok, Body, Req1} = cowboy_req:body(Req0),
+    {ContentType, Req0} = content_type(Req),
+    decode(Req0, ContentType).
+
+decode(Req, ContentType) ->
+    {ok, Body, Req1} = cowboy_req:body(Req),
     Decoded = case Body of
                   <<>> ->
                       [];
@@ -230,13 +227,12 @@ decode(Req) ->
               end,
     {ok, Decoded, Req1}.
 
-encode(Body, Req) ->
-    {ContentType, Req1} = media_type(Req),
-    case ContentType of
+encode(Body, MediaType, Req) ->
+    case MediaType of
         json ->
-            {jsx:encode(Body), Req1};
+            {jsx:encode(Body), Req};
         msgpack ->
-            {msgpack:pack(Body, [jsx]), Req1}
+            {msgpack:pack(Body, [jsx]), Req}
     end.
 
 options(Req, State, Methods) ->

@@ -17,11 +17,17 @@
          generate_etag/2,
          is_authorized/2]).
 
--export([read/2,
-         write/2]).
+-export([read_json/2,
+         write_json/2]).
 
--ignore_xref([read/2,
-              write/2,
+-export([read_msgpack/2,
+         write_msgpack/2]).
+
+-ignore_xref([
+              read_json/2,
+              write_json/2,
+              read_msgpack/2,
+              write_msgpack/2,
               allowed_methods/2,
               content_types_accepted/2,
               content_types_provided/2,
@@ -195,13 +201,20 @@ forbidden(Req, State = #state{module = M}) ->
 %% GET
 %%--------------------------------------------------------------------
 
-read(Req, State = #state{module = M}) ->
+
+read_json(Req, State) ->
+    read(Req, json, State).
+
+read_msgpack(Req, State) ->
+    read(Req, msgpack, State).
+
+read(Req, MediaType, State = #state{module = M}) ->
     case M:read(Req, State) of
         {{chunked, _StreamFun}, _Req, _State} = Reply ->
             Reply;
         {Reply, Req1, State1} ->
             Start = now(),
-            {Data, Req2} = wiggle_handler:encode(Reply, Req1),
+            {Data, Req2} = wiggle_handler:encode(Reply, MediaType, Req1),
             ?MEx(?P(State), <<"encode">>, Start),
             {Data, Req2, State1#state{obj = Data}}
     end.
@@ -210,7 +223,13 @@ read(Req, State = #state{module = M}) ->
 %% write
 %%--------------------------------------------------------------------
 
-write(Req, State = #state{module = M, body = undefined}) ->
+write_json(Req, State) ->
+    write(Req, json, State).
+
+write_msgpack(Req, State) ->
+    write(Req, msgpack, State).
+
+write(Req, ContentType, State = #state{module = M, body = undefined}) ->
     RawFun = case erlang:function_exported(M, raw_body, 1) of
                  true ->
                      fun M:raw_body/1;
@@ -222,11 +241,11 @@ write(Req, State = #state{module = M, body = undefined}) ->
             lager:info("This is a raw request"),
             write2(Req, State);
         false ->
-            {ok, Data, Req1} = wiggle_handler:decode(Req),
+            {ok, Data, Req1} = wiggle_handler:decode(Req, ContentType),
             write1(Req1, State#state{body = Data})
     end;
 
-write(Req, State) ->
+write(Req, _ContentType, State) ->
     write1(Req, State).
 
 write1(Req, State = #state{body = Data}) ->
