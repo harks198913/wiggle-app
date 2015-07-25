@@ -496,12 +496,7 @@ create(Req, State = #state{path = [?UUID(Vm), <<"fw_rules">>],
 
 create(Req, State = #state{path = [?UUID(Vm), <<"backups">>], version = Version}, Decoded) ->
     Comment = jsxd:get(<<"comment">>, <<"">>, Decoded),
-    Opts = case jsxd:get(<<"xml">>, true, Decoded) of
-               true ->
-                   [xml];
-               false ->
-                   []
-           end,
+    Opts = [xml],
     Start = now(),
     {ok, UUID} = case jsxd:get(<<"parent">>, Decoded) of
                      {ok, Parent} ->

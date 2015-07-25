@@ -8,7 +8,7 @@
 %% @doc If the ui_path is specified the content of this path will
 %% be served at the root directory.
 {mapping, "ui_path", "wiggle.ui_path",
-  [{default, "/opt/local/fifo-jingles/dist"},
+  [{default, "/opt/local/fifo-jingles"},
    {datatype, directory}]}.
 
 %% @doc The TCP IP that mdns messages arrive to.
