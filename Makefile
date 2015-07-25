@@ -1,8 +1,8 @@
-REBAR = $(shell pwd)/rebar
+REBAR = $(shell pwd)/rebar3
 
-.PHONY: deps version
+.PHONY: version
 
-all: .git/hooks/pre-commit deps compile
+all: .git/hooks/pre-commit compile
 
 .git/hooks/pre-commit: hooks/pre-commit
 	cp hooks/pre-commit .git/hooks
@@ -22,9 +22,6 @@ version_header: version
 compile:
 	$(REBAR) compile
 
-deps:
-	$(REBAR) get-deps
-
 clean:
 	$(REBAR) clean
 	[ -d ebin ] && rm -r ebin || true
@@ -35,9 +32,6 @@ distclean: clean devclean
 test: all
 	$(REBAR) skip_deps=true xref -r
 	$(REBAR) skip_deps=true eunit
-
-console: all
-	erl -pa deps/*/ebin ebin -s wiggle -config standalone.config
 
 ###
 ### Docs
