@@ -166,21 +166,35 @@ scope_perms([{_, _, _, Perms} | R], Acc) ->
     scope_perms(R, Acc ++ Perms).
 
 full_list(Req) ->
-    case cowboy_req:header(<<"x-full-list">>, Req) of
-        {<<"true">>, ReqX} ->
-            {true, ReqX};
-        {<<"True">>, ReqX} ->
-            {true, ReqX};
-        {_, ReqX} ->
-            {false, ReqX}
+    case cowboy_req:qs_val(<<"full-list">>, Req) of
+        {undefined, ReqY} ->
+            case cowboy_req:header(<<"x-full-list">>, ReqY) of
+                {<<"true">>, ReqX} ->
+                    {true, ReqX};
+                {<<"True">>, ReqX} ->
+                    {true, ReqX};
+                {_, ReqX} ->
+                    {false, ReqX}
+            end;
+        {<<"true">>, ReqY} ->
+            {true, ReqY};
+        {<<"True">>, ReqY} ->
+            {true, ReqY};
+        {_, ReqY} ->
+            {false, ReqY}
     end.
 
 full_list_fields(Req) ->
-    case cowboy_req:header(<<"x-full-list-fields">>, Req) of
-        {undefined, ReqX} ->
-            {[], ReqX};
-        {Fields, ReqX} ->
-            {re:split(Fields, ","), ReqX}
+    case cowboy_req:qs_val(<<"full-list-fields">>, Req) of
+        {undefined, ReqY} ->
+            case cowboy_req:header(<<"x-full-list-fields">>, ReqY) of
+                {undefined, ReqX} ->
+                    {[], ReqX};
+                {Fields, ReqX} ->
+                    {re:split(Fields, ","), ReqX}
+            end;
+        {Fields, ReqY} ->
+            {re:split(Fields, ","), ReqY}
     end.
 
 provided() ->
@@ -263,7 +277,7 @@ get_permissions(Token) ->
                   fun () -> ls_user:cache(Token) end).
 
 clear_permissions(#state{token = Token}) ->
-        e2qc:evict(permissions, Token).
+    e2qc:evict(permissions, Token).
 
 timeout_cache(Cache, Value, TTL1, TTL2, Fun) ->
     case application:get_env(wiggle, caching, true) of
