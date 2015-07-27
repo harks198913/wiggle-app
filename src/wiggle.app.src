@@ -25,6 +25,7 @@
                   folsom_ddb,
                   dqe,
                   erlydtl,
+                  cowboy_oauth,
                   cowboy
                  ]},
   {mod, { wiggle_app, []}},
