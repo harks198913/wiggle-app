@@ -40,7 +40,7 @@
   1},
  {<<"erlcloud">>,
   {git,"https://github.com/project-fifo/erlcloud",
-       {ref,"6bb4a7706cf807dab4eb5fdf07c57ede324d6c1b"}},
+       {ref,"5c56980eb42a0e1f4138136f218fde3032e47228"}},
   1},
  {<<"base16">>,
   {git,"https://github.com/goj/base16.git",
