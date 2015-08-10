@@ -22,4 +22,3 @@ rel/wiggle.tar.bz2
 manifest
 .rebar
 _build/
-rebar.lock

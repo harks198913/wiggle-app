@@ -69,7 +69,6 @@ get(State = #state{path = [?UUID(Dataset) | _]}) ->
 get(_State) ->
     not_found.
 
-
 permission_required(#state{method = <<"POST">>, path = []}) ->
     {ok, [<<"cloud">>, <<"datasets">>, <<"create">>]};
 
