@@ -8,10 +8,10 @@ all: .git/hooks/pre-commit compile
 	cp hooks/pre-commit .git/hooks
 
 quick-xref:
-	$(REBAR) xref skip_deps=true
+	$(REBAR) xref
 
 quick-test:
-	$(REBAR) skip_deps=true eunit
+	$(REBAR) eunit
 
 version:
 	@echo "$(shell git symbolic-ref HEAD 2> /dev/null | cut -b 12-)-$(shell git log --pretty=format:'%h, %ad' -1)" > wiggle.version
@@ -30,21 +30,21 @@ distclean: clean devclean
 	$(REBAR) delete-deps
 
 test: all
-	$(REBAR) skip_deps=true xref -r
-	$(REBAR) skip_deps=true eunit
+	$(REBAR) xref
+	$(REBAR) eunit
 
 ###
 ### Docs
 ###
 docs:
-	$(REBAR) skip_deps=true doc
+	$(REBAR) doc
 
 ##
 ## Developer targets
 ##
 
 xref: compile
-	@$(REBAR) xref skip_deps=true -r
+	@$(REBAR) xref
 
 ##
 ## Dialyzer

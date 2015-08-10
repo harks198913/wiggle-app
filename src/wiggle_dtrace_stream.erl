@@ -161,7 +161,7 @@ handle(Config, Req, State  = #dstate{encoder = Enc, type = Type,
     lager:debug("[dtrace] handle(~p)", [Config]),
     case update_vms(Config, State) of
         {ok, Config1} ->
-            {ok, Permissions} = wiggle_handler:get_persmissions(Token),
+            {ok, Permissions} = wiggle_handler:get_permissions(Token),
             Permission = [{must, 'allowed',
                            [<<"hypervisors">>, {<<"res">>, <<"uuid">>}, <<"get">>],
                            Permissions}],
