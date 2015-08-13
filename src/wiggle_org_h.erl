@@ -1,4 +1,4 @@
--module(wiggle_org_handler).
+-module(wiggle_org_h).
 -include("wiggle.hrl").
 
 -ifdef(TEST).
@@ -17,7 +17,7 @@
          write/3,
          delete/2]).
 
--behaviour(wiggle_rest_handler).
+-behaviour(wiggle_rest_h).
 
 allowed_methods(_Version, _Token, []) ->
     [<<"GET">>, <<"POST">>];
@@ -25,7 +25,7 @@ allowed_methods(_Version, _Token, []) ->
 allowed_methods(_Version, _Token, [?UUID(_Org)]) ->
     [<<"GET">>, <<"PUT">>, <<"DELETE">>];
 
-allowed_methods(_Version, _Token, [?UUID(_Org), <<"triggers">>]) ->
+allowed_methods(?V1, _Token, [?UUID(_Org), <<"triggers">>]) ->
     [<<"GET">>];
 
 allowed_methods(_Version, _Token, [?UUID(_Org), <<"triggers">> | _Trigger]) ->
@@ -35,10 +35,10 @@ allowed_methods(_Version, _Token, [?UUID(_Org), <<"metadata">> | _]) ->
     [<<"PUT">>, <<"DELETE">>].
 
 get(State = #state{path = [?UUID(Org) | _]}) ->
-    Start = now(),
+    Start = erlang:system_time(micro_seconds),
     R = case application:get_env(wiggle, org_ttl) of
             {ok, {TTL1, TTL2}} ->
-                wiggle_handler:timeout_cache_with_invalid(
+                wiggle_h:timeout_cache_with_invalid(
                   ?CACHE, Org, TTL1, TTL2, not_found,
                   fun() -> ls_org:get(Org) end);
             _ ->
@@ -65,7 +65,8 @@ permission_required(#state{method = <<"PUT">>, path = [?UUID(Org)]}) ->
 permission_required(#state{method = <<"DELETE">>, path = [?UUID(Org)]}) ->
     {ok, [<<"orgs">>, Org, <<"delete">>]};
 
-permission_required(#state{method = <<"GET">>, path = [?UUID(Org), <<"triggers">>]}) ->
+permission_required(#state{version = ?V1, method = <<"GET">>,
+                           path = [?UUID(Org), <<"triggers">>]}) ->
     {ok, [<<"orgs">>, Org, <<"get">>]};
 
 permission_required(#state{method = <<"POST">>,
@@ -127,17 +128,17 @@ permission_required(State) ->
 %%--------------------------------------------------------------------
 
 read(Req, State = #state{token = Token, path = [], full_list=FullList, full_list_fields=Filter}) ->
-    Start = now(),
-    {ok, Permissions} = wiggle_handler:get_permissions(Token),
+    Start = erlang:system_time(micro_seconds),
+    {ok, Permissions} = wiggle_h:get_permissions(Token),
     ?MSnarl(?P(State), Start),
-    Start1 = now(),
+    Start1 = erlang:system_time(micro_seconds),
     Permission = [{must, 'allowed',
                    [<<"orgs">>, {<<"res">>, <<"uuid">>}, <<"get">>],
                    Permissions}],
-    Res = wiggle_handler:list(fun ls_org:list/2,
-                              fun to_json/1, Token, Permission,
-                              FullList, Filter, org_list_ttl, ?FULL_CACHE,
-                              ?LIST_CACHE),
+    Res = wiggle_h:list(fun ls_org:list/2,
+                        fun to_json/1, Token, Permission,
+                        FullList, Filter, org_list_ttl, ?FULL_CACHE,
+                        ?LIST_CACHE),
 
     ?MSnarl(?P(State), Start1),
     {Res, Req, State};
@@ -145,7 +146,8 @@ read(Req, State = #state{token = Token, path = [], full_list=FullList, full_list
 read(Req, State = #state{path = [?UUID(_Org)], obj = OrgObj}) ->
     {to_json(OrgObj), Req, State};
 
-read(Req, State = #state{path = [?UUID(_Org), <<"triggers">>], obj = OrgObj}) ->
+read(Req, State = #state{version = ?V1, path = [?UUID(_Org), <<"triggers">>],
+                         obj = OrgObj}) ->
     %% can't get the ft_role:triggers since the json conversion would miss
     {jsxd:get(<<"triggers">>, [], to_json(OrgObj)), Req, State}.
 
@@ -155,7 +157,7 @@ read(Req, State = #state{path = [?UUID(_Org), <<"triggers">>], obj = OrgObj}) ->
 
 create(Req, State = #state{path = [], version = Version}, Decoded) ->
     {ok, Org} = jsxd:get(<<"name">>, Decoded),
-    Start = now(),
+    Start = erlang:system_time(micro_seconds),
     {ok, UUID} = ls_org:add(Org),
     e2qc:teardown(?LIST_CACHE),
     e2qc:teardown(?FULL_CACHE),
@@ -169,7 +171,7 @@ create(Req, State =
               version = Version
              }, Event) ->
     P = erlangify_trigger(Trigger, Event),
-    Start = now(),
+    Start = erlang:system_time(micro_seconds),
     ok = ls_org:add_trigger(Org, P),
     e2qc:evict(?CACHE, Org),
     e2qc:teardown(?FULL_CACHE),
@@ -179,7 +181,7 @@ create(Req, State =
 
 write(Req, State = #state{path = [?UUID(Org), <<"metadata">> | Path]}, [{K, V}])
   when is_binary(Org) ->
-    Start = now(),
+    Start = erlang:system_time(micro_seconds),
     ls_org:set_metadata(Org, [{[<<"public">> | Path] ++ [K], jsxd:from_list(V)}]),
     e2qc:evict(?CACHE, Org),
     e2qc:teardown(?FULL_CACHE),
@@ -191,7 +193,7 @@ write(Req, State = #state{path = [?UUID(Org), <<"metadata">> | Path]}, [{K, V}])
 %%--------------------------------------------------------------------
 
 delete(Req, State = #state{path = [?UUID(Org), <<"metadata">> | Path]}) ->
-    Start = now(),
+    Start = erlang:system_time(micro_seconds),
     ok = ls_org:set_metadata(Org, [{[<<"public">> | Path], delete}]),
     e2qc:evict(?CACHE, Org),
     e2qc:teardown(?FULL_CACHE),
@@ -199,7 +201,7 @@ delete(Req, State = #state{path = [?UUID(Org), <<"metadata">> | Path]}) ->
     {true, Req, State};
 
 delete(Req, State = #state{path = [?UUID(Org), <<"triggers">> , Trigger]}) ->
-    Start = now(),
+    Start = erlang:system_time(micro_seconds),
     ok = ls_org:remove_trigger(Org, Trigger),
     e2qc:evict(?CACHE, Org),
     e2qc:teardown(?FULL_CACHE),
@@ -207,7 +209,7 @@ delete(Req, State = #state{path = [?UUID(Org), <<"triggers">> , Trigger]}) ->
     {true, Req, State};
 
 delete(Req, State = #state{path = [?UUID(Org)]}) ->
-    Start = now(),
+    Start = erlang:system_time(micro_seconds),
     ok = ls_org:delete(Org),
     e2qc:evict(?CACHE, Org),
     e2qc:teardown(?LIST_CACHE),

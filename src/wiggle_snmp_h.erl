@@ -1,4 +1,4 @@
--module(wiggle_snmp_handler).
+-module(wiggle_snmp_h).
 -include("wiggle_version.hrl").
 
 %% External exports
@@ -25,7 +25,7 @@
 
 
 
-%% c("apps/wiggle/src/wiggle_snmp_handler.erl").
+%% c("apps/wiggle/src/wiggle_snmp_h.erl").
 reload() ->
     snmpa:unload_mibs(["WIGGLE-MIB"]),
     snmpc:compile("apps/wiggle/mibs/WIGGLE-MIB"),

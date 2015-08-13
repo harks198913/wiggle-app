@@ -1,7 +1,7 @@
 %% Feel free to use, reuse and abuse the code in this file.
 
 %% @doc Hello world handler.
--module(wiggle_session_handler).
+-module(wiggle_session_h).
 -include("wiggle.hrl").
 
 -ifdef(TEST).
@@ -16,7 +16,7 @@
          write/3,
          delete/2]).
 
--behaviour(wiggle_rest_handler).
+-behaviour(wiggle_rest_h).
 
 allowed_methods(?V1, _Token, []) ->
     [<<"POST">>];
@@ -38,7 +38,7 @@ get(#state{path = [<<"one_time_token">>], version = ?V2,
     {ok, {oauth2_token:generate('x-snarl-one-time-token'), Bearer}};
 
 get(State = #state{path = [Session], version = ?V1}) ->
-    Start = now(),
+    Start = erlang:system_time(micro_seconds),
     R = ls_user:get({token, Session}),
     ?MSnarl(?P(State), Start),
     R;
@@ -55,18 +55,18 @@ permission_required(_State) ->
 
 read(Req, State = #state{path = [<<"one_time_token">>],
                          obj = {OTT, Bearer}, version = ?V2}) ->
-    Start = now(),
+    Start = erlang:system_time(micro_seconds),
     {ok, OTT} = ls_token:add(OTT, 30, Bearer),
     ?MSnarl(?P(State), Start),
     {[{<<"expiery">>, 30}, {<<"token">>, OTT}], Req, State};
 
 read(Req, State = #state{path = [], token = Token, version = ?V2}) ->
     {ok, Obj} = ls_user:get(Token),
-    {wiggle_user_handler:to_json(Obj), Req, State};
+    {wiggle_user_h:to_json(Obj), Req, State};
 
 read(Req, State = #state{path = [Session], obj = Obj, version = ?V1}) ->
     Obj1 = jsxd:thread([{set, <<"session">>, Session}],
-                       wiggle_user_handler:to_json(Obj)),
+                       wiggle_user_h:to_json(Obj)),
     {Obj1, Req, State}.
 
 

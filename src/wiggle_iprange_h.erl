@@ -1,7 +1,7 @@
 %% Feel free to use, reuse and abuse the code in this file.
 
 %% @doc Hello world handler.
--module(wiggle_iprange_handler).
+-module(wiggle_iprange_h).
 -include("wiggle.hrl").
 
 -define(CACHE, iprange).
@@ -16,7 +16,7 @@
          write/3,
          delete/2]).
 
--behaviour(wiggle_rest_handler).
+-behaviour(wiggle_rest_h).
 
 allowed_methods(_Version, _Token, [?UUID(_Iprange), <<"metadata">>|_]) ->
     [<<"PUT">>, <<"DELETE">>];
@@ -28,10 +28,10 @@ allowed_methods(_Version, _Token, [?UUID(_Iprange)]) ->
     [<<"GET">>, <<"PUT">>, <<"DELETE">>].
 
 get(State = #state{path = [?UUID(Iprange) | _]}) ->
-    Start = now(),
+    Start = erlang:system_time(micro_seconds),
     R = case application:get_env(wiggle, iprange_ttl) of
             {ok, {TTL1, TTL2}} ->
-                wiggle_handler:timeout_cache_with_invalid(
+                wiggle_h:timeout_cache_with_invalid(
                   ?CACHE, Iprange, TTL1, TTL2, not_found,
                   fun() -> ls_iprange:get(Iprange) end);
             _ ->
@@ -72,14 +72,14 @@ permission_required(_State) ->
 %%--------------------------------------------------------------------
 
 read(Req, State = #state{token = Token, path = [], full_list=FullList, full_list_fields=Filter}) ->
-    Start = now(),
-    {ok, Permissions} = wiggle_handler:get_permissions(Token),
+    Start = erlang:system_time(micro_seconds),
+    {ok, Permissions} = wiggle_h:get_permissions(Token),
     ?MSnarl(?P(State), Start),
-    Start1 = now(),
+    Start1 = erlang:system_time(micro_seconds),
     Permission = [{must, 'allowed',
                    [<<"ipranges">>, {<<"res">>, <<"uuid">>}, <<"get">>],
                    Permissions}],
-    %% We can't use the wiggle_handler:list_fn/4 since we need to
+    %% We can't use the wiggle_h:list_fn/4 since we need to
     %% apply a transformation to the objects when full list is given.
     Fun = fun() ->
                   {ok, Res} = ls_iprange:list(Permission, FullList),
@@ -96,10 +96,10 @@ read(Req, State = #state{token = Token, path = [], full_list=FullList, full_list
                {ok, {TTL1, TTL2}} ->
                    case FullList of
                        true ->
-                           wiggle_handler:timeout_cache(
+                           wiggle_h:timeout_cache(
                              ?FULL_CACHE, {Token, Filter}, TTL1, TTL2, Fun);
                        _ ->
-                           wiggle_handler:timeout_cache(
+                           wiggle_h:timeout_cache(
                              ?LIST_CACHE, Token, TTL1, TTL2, Fun)
                    end;
                _ ->
@@ -136,7 +136,7 @@ create(Req, State = #state{path = [], version = Version}, Data) ->
     {ok, Last} = jsxd:get(<<"last">>, Data),
     {ok, Tag} = jsxd:get(<<"tag">>, Data),
     Vlan = jsxd:get(<<"vlan">>, 0, Data),
-    Start = now(),
+    Start = erlang:system_time(micro_seconds),
     case ls_iprange:create(Iprange, Network, Gateway, Netmask, First, Last, Tag, Vlan) of
         {ok, UUID} ->
             ?MSniffle(?P(State), Start),
@@ -154,7 +154,7 @@ write(Req, State = #state{method = <<"POST">>, path = []}, _) ->
     {true, Req, State};
 
 write(Req, State = #state{path = [?UUID(Iprange), <<"metadata">> | Path]}, [{K, V}]) ->
-    Start = now(),
+    Start = erlang:system_time(micro_seconds),
     e2qc:evict(?CACHE, Iprange),
     e2qc:teardown(?FULL_CACHE),
     ls_iprange:set_metadata(Iprange, [{Path ++ [K], jsxd:from_list(V)}]),
@@ -169,7 +169,7 @@ write(Req, State, _Body) ->
 %%--------------------------------------------------------------------
 
 delete(Req, State = #state{path = [?UUID(Iprange), <<"metadata">> | Path]}) ->
-    Start = now(),
+    Start = erlang:system_time(micro_seconds),
     e2qc:evict(?CACHE, Iprange),
     e2qc:teardown(?FULL_CACHE),
     ls_iprange:set_metadata(Iprange, [{Path, delete}]),
@@ -177,7 +177,7 @@ delete(Req, State = #state{path = [?UUID(Iprange), <<"metadata">> | Path]}) ->
     {true, Req, State};
 
 delete(Req, State = #state{path = [?UUID(Iprange)]}) ->
-    Start = now(),
+    Start = erlang:system_time(micro_seconds),
     e2qc:evict(?CACHE, Iprange),
     e2qc:teardown(?LIST_CACHE),
     e2qc:teardown(?FULL_CACHE),

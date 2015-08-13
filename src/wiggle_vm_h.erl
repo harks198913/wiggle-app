@@ -1,4 +1,4 @@
--module(wiggle_vm_handler).
+-module(wiggle_vm_h).
 
 -include("wiggle.hrl").
 
@@ -17,7 +17,7 @@
 
 -ignore_xref([schema/1]).
 
--behaviour(wiggle_rest_handler).
+-behaviour(wiggle_rest_h).
 
 -define(GUARD_CALL(Call),
         case Call of
@@ -29,7 +29,7 @@
         end).
 
 -define(LIB(Call),
-        Start = now(),
+        Start = erlang:system_time(micro_seconds),
         case Call of
             ok ->
                 ?MSniffle(?P(State), Start),
@@ -67,8 +67,11 @@ allowed_methods(_Version, _Token, [?UUID(_Vm), <<"hypervisor">>]) ->
 allowed_methods(_Version, _Token, [?UUID(_Vm), <<"owner">>]) ->
     [<<"PUT">>];
 
-allowed_methods(_Version, _Token, [?UUID(_Vm), <<"services">>]) ->
+allowed_methods(?V1, _Token, [?UUID(_Vm), <<"services">>]) ->
     [<<"PUT">>, <<"GET">>];
+
+allowed_methods(_Version, _Token, [?UUID(_Vm), <<"services">>]) ->
+    [<<"PUT">>];
 
 allowed_methods(_Version, _Token, [?UUID(_Vm), <<"metadata">>|_]) ->
     [<<"PUT">>, <<"DELETE">>];
@@ -79,26 +82,44 @@ allowed_methods(_Version, _Token, [?UUID(_Vm), <<"nics">>, _Mac]) ->
 allowed_methods(_Version, _Token, [?UUID(_Vm), <<"nics">>]) ->
     [<<"POST">>];
 
-allowed_methods(_Version, _Token, [?UUID(_Vm), <<"snapshots">>, _ID]) ->
+allowed_methods(?V1, _Token, [?UUID(_Vm), <<"snapshots">>, _ID]) ->
     [<<"GET">>, <<"PUT">>, <<"DELETE">>];
+
+allowed_methods(_Version, _Token, [?UUID(_Vm), <<"snapshots">>, _ID]) ->
+    [<<"PUT">>, <<"DELETE">>];
+
+allowed_methods(?V1, _Token, [?UUID(_Vm), <<"snapshots">>]) ->
+    [<<"GET">>, <<"POST">>];
 
 allowed_methods(_Version, _Token, [?UUID(_Vm), <<"snapshots">>]) ->
-    [<<"GET">>, <<"POST">>];
+    [<<"POST">>];
 
-allowed_methods(_Version, _Token, [?UUID(_Vm), <<"fw_rules">>, _ID]) ->
+allowed_methods(?V1, _Token, [?UUID(_Vm), <<"fw_rules">>, _ID]) ->
     [<<"GET">>, <<"DELETE">>]; %% We might need to add PUT later.
 
-allowed_methods(_Version, _Token, [?UUID(_Vm), <<"fw_rules">>]) ->
+allowed_methods(_Version, _Token, [?UUID(_Vm), <<"fw_rules">>, _ID]) ->
+    [<<"DELETE">>]; %% We might need to add PUT later.
+
+allowed_methods(?V1, _Token, [?UUID(_Vm), <<"fw_rules">>]) ->
     [<<"GET">>, <<"POST">>];
 
-allowed_methods(_Version, _Token, [?UUID(_Vm), <<"backups">>, _ID]) ->
+allowed_methods(_Version, _Token, [?UUID(_Vm), <<"fw_rules">>]) ->
+    [<<"POST">>];
+
+allowed_methods(?V1, _Token, [?UUID(_Vm), <<"backups">>, _ID]) ->
     [<<"GET">>, <<"PUT">>, <<"DELETE">>];
+
+allowed_methods(_Version, _Token, [?UUID(_Vm), <<"backups">>, _ID]) ->
+    [<<"PUT">>, <<"DELETE">>];
+
+allowed_methods(?V1, _Token, [?UUID(_Vm), <<"backups">>]) ->
+    [<<"POST">>];
 
 allowed_methods(_Version, _Token, [?UUID(_Vm), <<"backups">>]) ->
     [<<"GET">>, <<"POST">>].
 
 get(State = #state{path = [?UUID(Vm), <<"backups">>, Snap]}) ->
-    case wiggle_vm_handler:get(State#state{path=[?UUID(Vm)]}) of
+    case wiggle_vm_h:get(State#state{path=[?UUID(Vm)]}) of
         {ok, Obj} ->
             case jsxd:get([Snap], ft_vm:backups(Obj)) of
                 undefined -> not_found;
@@ -109,7 +130,7 @@ get(State = #state{path = [?UUID(Vm), <<"backups">>, Snap]}) ->
     end;
 
 get(State = #state{path = [?UUID(Vm), <<"snapshots">>, Snap]}) ->
-    case wiggle_vm_handler:get(State#state{path=[?UUID(Vm)]}) of
+    case wiggle_vm_h:get(State#state{path=[?UUID(Vm)]}) of
         {ok, Obj} ->
             case jsxd:get([Snap], ft_vm:snapshots(Obj)) of
                 undefined -> not_found;
@@ -120,7 +141,7 @@ get(State = #state{path = [?UUID(Vm), <<"snapshots">>, Snap]}) ->
     end;
 
 get(State = #state{path = [?UUID(Vm), <<"nics">>, Mac]}) ->
-    case wiggle_vm_handler:get(State#state{path=[?UUID(Vm)]}) of
+    case wiggle_vm_h:get(State#state{path=[?UUID(Vm)]}) of
         {ok, Obj} ->
             Macs = [jsxd:get([<<"mac">>], <<>>, N) ||
                        N <- jsxd:get([<<"networks">>], [], ft_vm:config(Obj))],
@@ -135,7 +156,7 @@ get(State = #state{path = [?UUID(Vm), <<"nics">>, Mac]}) ->
     end;
 
 get(State = #state{path = [?UUID(Vm), <<"fw_rules">>, IDB]}) ->
-    case wiggle_vm_handler:get(State#state{path=[?UUID(Vm)]}) of
+    case wiggle_vm_h:get(State#state{path=[?UUID(Vm)]}) of
         {ok, Obj} ->
             ID = binary_to_integer(IDB),
             case find_rule(ID, Obj) of
@@ -149,13 +170,13 @@ get(State = #state{path = [?UUID(Vm), <<"fw_rules">>, IDB]}) ->
     end;
 
 get(#state{path = [?UUID(_Vm), <<"metrics">>]}) ->
-    {ok, now()};
+    {ok, erlang:system_time(micro_seconds)};
 
 get(State = #state{path = [?UUID(Vm) | _]}) ->
-    Start = now(),
+    Start = erlang:system_time(micro_seconds),
     R = case application:get_env(wiggle, vm_ttl) of
             {ok, {TTL1, TTL2}} ->
-                wiggle_handler:timeout_cache_with_invalid(
+                wiggle_h:timeout_cache_with_invalid(
                   ?CACHE, Vm, TTL1, TTL2, not_found,
                   fun() -> ls_vm:get(Vm) end);
             _ ->
@@ -199,13 +220,15 @@ permission_required(#state{method = <<"PUT">>, path = [?UUID(Vm), <<"nics">>, _]
 permission_required(#state{method = <<"DELETE">>, path = [?UUID(Vm), <<"nics">>, _]}) ->
     {ok, [<<"vms">>, Vm, <<"edit">>]};
 
-permission_required(#state{method = <<"GET">>, path = [?UUID(Vm), <<"snapshots">>]}) ->
+permission_required(#state{version=?V1, method = <<"GET">>,
+                           path = [?UUID(Vm), <<"snapshots">>]}) ->
     {ok, [<<"vms">>, Vm, <<"get">>]};
 
 permission_required(#state{method = <<"POST">>, path = [?UUID(Vm), <<"snapshots">>]}) ->
     {ok, [<<"vms">>, Vm, <<"snapshot">>]};
 
-permission_required(#state{method = <<"GET">>, path = [?UUID(Vm), <<"fw_rules">>]}) ->
+permission_required(#state{version=?V1, method = <<"GET">>,
+                           path = [?UUID(Vm), <<"fw_rules">>]}) ->
     {ok, [<<"vms">>, Vm, <<"get">>]};
 
 permission_required(#state{method = <<"POST">>, path = [?UUID(Vm), <<"fw_rules">>]}) ->
@@ -214,22 +237,26 @@ permission_required(#state{method = <<"POST">>, path = [?UUID(Vm), <<"fw_rules">
 permission_required(#state{method = <<"DELETE">>, path = [?UUID(Vm), <<"fw_rules">>, _FWID]}) ->
     {ok, [<<"vms">>, Vm, <<"edit">>]};
 
-permission_required(#state{method = <<"GET">>, path = [?UUID(Vm), <<"services">>]}) ->
+permission_required(#state{version=?V1, method = <<"GET">>,
+                           path = [?UUID(Vm), <<"services">>]}) ->
     {ok, [<<"vms">>, Vm, <<"get">>]};
 
 permission_required(#state{method = <<"PUT">>, path = [?UUID(Vm), <<"services">>]}) ->
     {ok, [<<"vms">>, Vm, <<"edit">>]};
 
-permission_required(#state{method = <<"GET">>, path = [?UUID(Vm), <<"snapshots">>, _Snap]}) ->
+permission_required(#state{version=?V1, method = <<"GET">>,
+                           path = [?UUID(Vm), <<"snapshots">>, _Snap]}) ->
     {ok, [<<"vms">>, Vm, <<"get">>]};
 
-permission_required(#state{method = <<"GET">>, path = [?UUID(Vm), <<"backups">>]}) ->
+permission_required(#state{version=?V1, method = <<"GET">>,
+                           path = [?UUID(Vm), <<"backups">>]}) ->
     {ok, [<<"vms">>, Vm, <<"get">>]};
 
 permission_required(#state{method = <<"POST">>, path = [?UUID(Vm), <<"backups">>]}) ->
     {ok, [<<"vms">>, Vm, <<"backup">>]};
 
-permission_required(#state{method = <<"GET">>, path = [?UUID(Vm), <<"backups">>, _Snap]}) ->
+permission_required(#state{version=?V1, method = <<"GET">>,
+                           path = [?UUID(Vm), <<"backups">>, _Snap]}) ->
     {ok, [<<"vms">>, Vm, <<"get">>]};
 
 permission_required(#state{method = <<"PUT">>, path = [?UUID(_Vm), <<"owner">>], body = undefiend}) ->
@@ -376,27 +403,27 @@ schema(_State) ->
 %%--------------------------------------------------------------------
 
 read(Req, State = #state{token = Token, path = [], full_list=FullList, full_list_fields=Filter}) ->
-    Start = now(),
-    {ok, Permissions} = wiggle_handler:get_permissions(Token),
+    Start = erlang:system_time(micro_seconds),
+    {ok, Permissions} = wiggle_h:get_permissions(Token),
     ?MSnarl(?P(State), Start),
-    Start1 = now(),
+    Start1 = erlang:system_time(micro_seconds),
     Permission = [{must, 'allowed',
                    [<<"vms">>, {<<"res">>, <<"uuid">>}, <<"get">>],
                    Permissions}],
-    Res = wiggle_handler:list(fun ls_vm:list/2,
-                              fun to_json/1, Token, Permission,
-                              FullList, Filter, vm_list_ttl, ?FULL_CACHE,
-                              ?LIST_CACHE),
+    Res = wiggle_h:list(fun ls_vm:list/2,
+                        fun to_json/1, Token, Permission,
+                        FullList, Filter, vm_list_ttl, ?FULL_CACHE,
+                        ?LIST_CACHE),
     ?MSniffle(?P(State), Start1),
     {Res, Req, State};
 
-read(Req, State = #state{path = [?UUID(_Vm), <<"snapshots">>], obj = Obj}) ->
+read(Req, State = #state{version=?V1, path = [?UUID(_Vm), <<"snapshots">>], obj = Obj}) ->
     Snaps = jsxd:fold(fun(UUID, Snap, Acc) ->
                               [jsxd:set(<<"uuid">>, UUID, Snap) | Acc]
                       end, [], ft_vm:snapshots(Obj)),
     {Snaps, Req, State};
 
-read(Req, State = #state{path = [?UUID(_Vm), <<"snapshots">>, SnapID], obj = Obj}) ->
+read(Req, State = #state{version=?V1, path = [?UUID(_Vm), <<"snapshots">>, SnapID], obj = Obj}) ->
     case jsxd:get([SnapID], ft_vm:snapshots(Obj)) of
         {ok, SnapObj} ->
             {jsxd:set(<<"uuid">>, SnapID, SnapObj), Req, State};
@@ -405,13 +432,13 @@ read(Req, State = #state{path = [?UUID(_Vm), <<"snapshots">>, SnapID], obj = Obj
 
     end;
 
-read(Req, State = #state{path = [?UUID(_Vm), <<"backups">>], obj = Obj}) ->
+read(Req, State = #state{version=?V1, path = [?UUID(_Vm), <<"backups">>], obj = Obj}) ->
     Snaps = jsxd:fold(fun(UUID, Snap, Acc) ->
                               [jsxd:set(<<"uuid">>, UUID, Snap) | Acc]
                       end, [], ft_vm:backups(Obj)),
     {Snaps, Req, State};
 
-read(Req, State = #state{path = [?UUID(_Vm), <<"backups">>, SnapID], obj = Obj}) ->
+read(Req, State = #state{version=?V1, path = [?UUID(_Vm), <<"backups">>, SnapID], obj = Obj}) ->
     case jsxd:get([SnapID], ft_vm:backups(Obj)) of
         {ok, SnapObj} ->
             {jsxd:set(<<"uuid">>, SnapID, SnapObj), Req, State};
@@ -419,10 +446,10 @@ read(Req, State = #state{path = [?UUID(_Vm), <<"backups">>, SnapID], obj = Obj})
             {null, Req, State}
     end;
 
-read(Req, State = #state{path = [?UUID(_Vm), <<"services">>], obj = Obj}) ->
+read(Req, State = #state{version=?V1, path = [?UUID(_Vm), <<"services">>], obj = Obj}) ->
     {ft_vm:services(Obj), Req, State};
 
-read(Req, State = #state{path = [?UUID(_Vm), <<"services">>, Service], obj = Obj}) ->
+read(Req, State = #state{version=?V1, path = [?UUID(_Vm), <<"services">>, Service], obj = Obj}) ->
     {jsxd:get([Service], [{}], ft_vm:services(Obj)), Req, State};
 
 read(Req, State = #state{path = [?UUID(_Vm)], obj = Obj}) ->
@@ -462,7 +489,7 @@ create(Req, State = #state{path = [], version = Version, token = Token}, Decoded
                       jsxd:set(<<"requirements">>, [], Config)
               end,
     try
-        Start = now(),
+        Start = erlang:system_time(micro_seconds),
         {ok, UUID} = ls_vm:create(Package, Dataset, jsxd:set(<<"owner">>, user(State), Config1)),
         e2qc:teardown(?LIST_CACHE),
         e2qc:teardown(?FULL_CACHE),
@@ -477,7 +504,7 @@ create(Req, State = #state{path = [], version = Version, token = Token}, Decoded
 
 create(Req, State = #state{path = [?UUID(Vm), <<"snapshots">>], version = Version}, Decoded) ->
     Comment = jsxd:get(<<"comment">>, <<"">>, Decoded),
-    Start = now(),
+    Start = erlang:system_time(micro_seconds),
     {ok, UUID} = ls_vm:snapshot(Vm, Comment),
     e2qc:evict(?CACHE, Vm),
     e2qc:teardown(?FULL_CACHE),
@@ -486,7 +513,7 @@ create(Req, State = #state{path = [?UUID(Vm), <<"snapshots">>], version = Versio
 
 create(Req, State = #state{path = [?UUID(Vm), <<"fw_rules">>],
                            version = Version}, RuleJSON) ->
-    Start = now(),
+    Start = erlang:system_time(micro_seconds),
     Rule = ft_vm:json_to_fw_rule(RuleJSON),
     ls_vm:add_fw_rule(Vm, Rule),
     e2qc:evict(?CACHE, Vm),
@@ -497,7 +524,7 @@ create(Req, State = #state{path = [?UUID(Vm), <<"fw_rules">>],
 create(Req, State = #state{path = [?UUID(Vm), <<"backups">>], version = Version}, Decoded) ->
     Comment = jsxd:get(<<"comment">>, <<"">>, Decoded),
     Opts = [xml],
-    Start = now(),
+    Start = erlang:system_time(micro_seconds),
     {ok, UUID} = case jsxd:get(<<"parent">>, Decoded) of
                      {ok, Parent} ->
                          Opts1 = case jsxd:get(<<"delete">>, false, Decoded) of
@@ -525,7 +552,7 @@ create(Req, State = #state{path = [?UUID(Vm), <<"backups">>], version = Version}
 
 create(Req, State = #state{path = [?UUID(Vm), <<"nics">>], version = Version}, Decoded) ->
     {ok, Network} = jsxd:get(<<"network">>, Decoded),
-    Start = now(),
+    Start = erlang:system_time(micro_seconds),
     case ls_vm:add_nic(Vm, Network) of
         ok ->
             ?MSniffle(?P(State), Start),
@@ -569,7 +596,6 @@ write(Req, State = #state{path = [<<"dry_run">>], token = Token}, Decoded) ->
         try
             {ok, User} = ls_user:get(Token),
             Owner = ft_user:uuid(User),
-            Start = now(),
             case ls_vm:dry_run(Package, Dataset,
                                jsxd:set(<<"owner">>, Owner, Config1)) of
                 {ok, success} ->
@@ -588,8 +614,8 @@ write(Req, State = #state{path = [<<"dry_run">>], token = Token}, Decoded) ->
     end;
 
 write(Req, State = #state{path = [?UUID(Vm), <<"services">>]},
-       [{<<"action">>, <<"enable">>},
-        {<<"service">>, Service}]) ->
+      [{<<"action">>, <<"enable">>},
+       {<<"service">>, Service}]) ->
     e2qc:evict(?CACHE, Vm),
     e2qc:teardown(?FULL_CACHE),
     ls_vm:service_enable(Vm, Service),
@@ -631,7 +657,7 @@ write(Req, State = #state{path = [_, <<"nics">>]}, _Body) ->
     {true, Req, State};
 
 write(Req, State = #state{path = [?UUID(Vm), <<"owner">>]}, [{<<"org">>, Org}]) ->
-    Start = now(),
+    Start = erlang:system_time(micro_seconds),
     case ls_org:get(Org) of
         {ok, _} ->
             e2qc:evict(?CACHE, Vm),
@@ -783,7 +809,7 @@ write(Req, State, _Body) ->
 %%--------------------------------------------------------------------
 
 delete(Req, State = #state{path = [?UUID(Vm), <<"snapshots">>, UUID]}) ->
-    Start = now(),
+    Start = erlang:system_time(micro_seconds),
     ok = ls_vm:delete_snapshot(Vm, UUID),
     e2qc:evict(?CACHE, Vm),
     e2qc:teardown(?FULL_CACHE),
@@ -792,7 +818,7 @@ delete(Req, State = #state{path = [?UUID(Vm), <<"snapshots">>, UUID]}) ->
 
 delete(Req, State = #state{path = [?UUID(Vm), <<"fw_rules">>, RuleIDs],
                            obj = Obj}) ->
-    Start = now(),
+    Start = erlang:system_time(micro_seconds),
     RuleID = binary_to_integer(RuleIDs),
     {ok, Rule} = find_rule(RuleID, Obj),
     ok = ls_vm:remove_fw_rule(Vm, Rule),
@@ -803,7 +829,7 @@ delete(Req, State = #state{path = [?UUID(Vm), <<"fw_rules">>, RuleIDs],
 
 delete(Req, State = #state{path = [?UUID(Vm), <<"backups">>, UUID],
                            body=[{<<"location">>, <<"hypervisor">>}]}) ->
-    Start = now(),
+    Start = erlang:system_time(micro_seconds),
     ok = ls_vm:delete_backup(Vm, UUID, hypervisor),
     e2qc:evict(?CACHE, Vm),
     e2qc:teardown(?FULL_CACHE),
@@ -811,7 +837,7 @@ delete(Req, State = #state{path = [?UUID(Vm), <<"backups">>, UUID],
     {true, Req, State};
 
 delete(Req, State = #state{path = [?UUID(Vm), <<"backups">>, UUID]}) ->
-    Start = now(),
+    Start = erlang:system_time(micro_seconds),
     ok = ls_vm:delete_backup(Vm, UUID, cloud),
     e2qc:evict(?CACHE, Vm),
     e2qc:teardown(?FULL_CACHE),
@@ -819,7 +845,7 @@ delete(Req, State = #state{path = [?UUID(Vm), <<"backups">>, UUID]}) ->
     {true, Req, State};
 
 delete(Req, State = #state{path = [?UUID(Vm), <<"nics">>, Mac]}) ->
-    Start = now(),
+    Start = erlang:system_time(micro_seconds),
     ok = ls_vm:remove_nic(Vm, Mac),
     e2qc:evict(?CACHE, Vm),
     e2qc:teardown(?FULL_CACHE),
@@ -828,7 +854,7 @@ delete(Req, State = #state{path = [?UUID(Vm), <<"nics">>, Mac]}) ->
 
 delete(Req, State = #state{path = [?UUID(Vm)],
                            body=[{<<"location">>, <<"hypervisor">>}]}) ->
-    Start = now(),
+    Start = erlang:system_time(micro_seconds),
     ok = ls_vm:store(user(State), Vm),
     e2qc:evict(?CACHE, Vm),
     e2qc:teardown(?FULL_CACHE),
@@ -836,7 +862,7 @@ delete(Req, State = #state{path = [?UUID(Vm)],
     {true, Req, State};
 
 delete(Req, State = #state{path = [?UUID(Vm), <<"hypervisor">>]}) ->
-    Start = now(),
+    Start = erlang:system_time(micro_seconds),
     ok = ls_vm:store(user(State), Vm),
     e2qc:evict(?CACHE, Vm),
     e2qc:teardown(?FULL_CACHE),
@@ -844,7 +870,7 @@ delete(Req, State = #state{path = [?UUID(Vm), <<"hypervisor">>]}) ->
     {true, Req, State};
 
 delete(Req, State = #state{path = [?UUID(Vm)]}) ->
-    Start = now(),
+    Start = erlang:system_time(micro_seconds),
     case ls_vm:delete(user(State), Vm) of
         ok ->
             e2qc:evict(?CACHE, Vm),
@@ -859,7 +885,7 @@ delete(Req, State = #state{path = [?UUID(Vm)]}) ->
     end;
 
 delete(Req, State = #state{path = [?UUID(Vm), <<"metadata">> | Path]}) ->
-    Start = now(),
+    Start = erlang:system_time(micro_seconds),
     ls_vm:set_metadata(Vm, [{Path, delete}]),
     e2qc:evict(?CACHE, Vm),
     e2qc:teardown(?FULL_CACHE),
@@ -901,7 +927,7 @@ valid_pit(_PIT) ->
 
 perf(UUID, QS) ->
     Zone = perf_zone_id(UUID),
-    Elems = perf_cpu(Zone) ++ perf_mem(Zone) ++ perf_swap(Zone) 
+    Elems = perf_cpu(Zone) ++ perf_mem(Zone) ++ perf_swap(Zone)
         ++ perf_net(Zone, <<"net0">>) ++ perf_zfs(Zone),
     case lists:keytake(<<"aggr">>, 1, QS) of
         false ->
@@ -984,11 +1010,10 @@ perf_zfs(Zone) ->
      {["derivate('", Zone, "'.'zfs'.'writes' BUCKET zone)"], "zfs-write-ops"}].
 
 apply_aggr(Aggr, Res, Elements) ->
-     [{[Aggr, $(, Qry, ", ", Res, $)], Alias} ||
-         {Qry, Alias} <- Elements].
+    [{[Aggr, $(, Qry, ", ", Res, $)], Alias} ||
+        {Qry, Alias} <- Elements].
 
 
 apply_query(Elements, Range) ->
     Elements1 = [[Qry, " AS '", Alias, "'"] || {Qry, Alias} <- Elements],
     iolist_to_binary(["SELECT ", string:join(Elements1, ", "), " ", Range]).
-

@@ -64,7 +64,7 @@ start(_StartType, _StartArgs) ->
             end,
             R = wiggle_sup:start_link(),
             lager_watchdog_srv:set_version(?VERSION),
-            wiggle_snmp_handler:start(),
+            wiggle_snmp_h:start(),
             R;
         _ ->
             wiggle_sup:start_link()
@@ -100,48 +100,48 @@ dispatchs() ->
      {<<"/api/:version/oauth/2fa">>,
       cowboy_oauth_2fa, []},
      {<<"/api/:version/sessions/[...]">>,
-      wiggle_rest_handler, [wiggle_session_handler]}] ++
+      wiggle_rest_h, [wiggle_session_h]}] ++
         %% Snarl related rules (we only exclude them if oauth is selected)
         case API of
             oauth2 ->
                 [];
             _ ->
                 [{<<"/api/:version/users/[...]">>,
-                  wiggle_rest_handler, [wiggle_user_handler]},
+                  wiggle_rest_h, [wiggle_user_h]},
                  {<<"/api/:version/roles/[...]">>,
-                  wiggle_rest_handler, [wiggle_role_handler]},
+                  wiggle_rest_h, [wiggle_role_h]},
                  {<<"/api/:version/clients/[...]">>,
-                  wiggle_rest_handler, [wiggle_client_handler]},
+                  wiggle_rest_h, [wiggle_client_h]},
                  {<<"/api/:version/orgs/[...]">>,
-                  wiggle_rest_handler, [wiggle_org_handler]}]
+                  wiggle_rest_h, [wiggle_org_h]}]
         end ++
         %% Sniffle realted rules (we only use them if all is selected)
         case API of
             all ->
                 [{<<"/api/:version/cloud/[...]">>,
-                  wiggle_rest_handler, [wiggle_cloud_handler]},
+                  wiggle_rest_h, [wiggle_cloud_h]},
                  {<<"/api/:version/hypervisors/[...]">>,
-                  wiggle_rest_handler, [wiggle_hypervisor_handler]},
+                  wiggle_rest_h, [wiggle_hypervisor_h]},
                  {<<"/api/:version/dtrace/:uuid/stream">>,
                   wiggle_dtrace_stream, []},
                  {<<"/api/:version/dtrace/[...]">>,
-                  wiggle_rest_handler, [wiggle_dtrace_handler]},
+                  wiggle_rest_h, [wiggle_dtrace_h]},
                  {<<"/api/:version/vms/:uuid/console">>,
-                  wiggle_console_handler, []},
+                  wiggle_console_h, []},
                  {<<"/api/:version/vms/:uuid/vnc">>,
-                  wiggle_vnc_handler, []},
+                  wiggle_vnc_h, []},
                  {<<"/api/:version/vms/[...]">>,
-                  wiggle_rest_handler, [wiggle_vm_handler]},
+                  wiggle_rest_h, [wiggle_vm_h]},
                  {<<"/api/:version/ipranges/[...]">>,
-                  wiggle_rest_handler, [wiggle_iprange_handler]},
+                  wiggle_rest_h, [wiggle_iprange_h]},
                  {<<"/api/:version/networks/[...]">>,
-                  wiggle_rest_handler, [wiggle_network_handler]},
+                  wiggle_rest_h, [wiggle_network_h]},
                  {<<"/api/:version/groupings/[...]">>,
-                  wiggle_rest_handler, [wiggle_grouping_handler]},
+                  wiggle_rest_h, [wiggle_grouping_h]},
                  {<<"/api/:version/datasets/[...]">>,
-                  wiggle_rest_handler, [wiggle_dataset_handler]},
+                  wiggle_rest_h, [wiggle_dataset_h]},
                  {<<"/api/:version/packages/[...]">>,
-                  wiggle_rest_handler, [wiggle_package_handler]}];
+                  wiggle_rest_h, [wiggle_package_h]}];
             _ ->
                 []
         end ++

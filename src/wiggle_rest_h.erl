@@ -1,4 +1,4 @@
--module(wiggle_rest_handler).
+-module(wiggle_rest_h).
 
 -include("wiggle.hrl").
 
@@ -73,27 +73,27 @@ init(_Transport, _Req, _) ->
     {upgrade, protocol, cowboy_rest}.
 
 rest_init(Req, [Module]) ->
-    {ok, Req1, State} = wiggle_handler:initial_state(Req),
+    {ok, Req1, State} = wiggle_h:initial_state(Req),
     {ok, Req1, State#state{module = Module}}.
 
 rest_terminate(_Req, _State) ->
     ok.
 
 service_available(Req, State) ->
-    {wiggle_handler:service_available(), Req, State}.
+    {wiggle_h:service_available(), Req, State}.
 
 options(Req, State = #state{module = M}) ->
     Methods = M:allowed_methods(State#state.version,
                                 State#state.token,
                                 State#state.path),
-    wiggle_handler:options(Req, State,Methods).
+    wiggle_h:options(Req, State,Methods).
 
 content_types_provided(Req, State = #state{module = M}) ->
     CTFun = case erlang:function_exported(M, content_types_provided, 1) of
                 true ->
                     fun M:content_types_provided/1;
                 false ->
-                    fun(_) -> wiggle_handler:provided() end
+                    fun(_) -> wiggle_h:provided() end
             end,
     {CTFun(State), Req, State}.
 
@@ -102,7 +102,7 @@ content_types_accepted(Req, State = #state{module = M}) ->
                 true ->
                     fun M:content_types_accepted/1;
                 false ->
-                    fun(_) -> wiggle_handler:accepted() end
+                    fun(_) -> wiggle_h:accepted() end
             end,
     {CTFun(State), Req, State}.
 
@@ -143,12 +143,12 @@ is_authorized(Req, State = #state{method = <<"OPTIONS">>}) ->
     {true, Req, State};
 
 is_authorized(Req, State = #state{method = <<"GET">>,
-                                  module = wiggle_cloud_handler,
+                                  module = wiggle_cloud_h,
                                   path = [<<"connection">>]}) ->
     {true, Req, State};
 
 is_authorized(Req, State = #state{method = <<"POST">>,
-                                  module = wiggle_session_handler,
+                                  module = wiggle_session_h,
                                   path = []}) ->
     {true, Req, State};
 
@@ -162,12 +162,12 @@ forbidden(Req, State = #state{method = <<"OPTIONS">>}) ->
     {false, Req, State};
 
 forbidden(Req, State = #state{method = <<"GET">>,
-                              module = wiggle_cloud_handler,
+                              module = wiggle_cloud_h,
                               path = [<<"connection">>]}) ->
     {false, Req, State};
 
 forbidden(Req, State = #state{method = <<"POST">>,
-                              module = wiggle_session_handler,
+                              module = wiggle_session_h,
                               path = []}) ->
     {false, Req, State};
 
@@ -177,7 +177,7 @@ forbidden(Req, State = #state{token = undefined}) ->
 forbidden(Req, State = #state{module = M}) ->
     case M:permission_required(State) of
         {error, needs_decode} ->
-            {ok, Decoded, Req1} = wiggle_handler:decode(Req),
+            {ok, Decoded, Req1} = wiggle_h:decode(Req),
             forbidden(Req1, State#state{body = Decoded});
         undefined ->
             {true, Req, State};
@@ -190,11 +190,11 @@ forbidden(Req, State = #state{module = M}) ->
                                     %% will always return false.
                                     false;
                                (Permission, Acc) ->
-                                    Acc andalso wiggle_handler:allowed(State, Permission)
+                                    Acc andalso wiggle_h:allowed(State, Permission)
                             end, true, Permissions),
             {not R, Req, State};
         {ok, Permission} ->
-            {not wiggle_handler:allowed(State, Permission), Req, State}
+            {not wiggle_h:allowed(State, Permission), Req, State}
     end.
 
 %%--------------------------------------------------------------------
@@ -213,8 +213,8 @@ read(Req, MediaType, State = #state{module = M}) ->
         {{chunked, _StreamFun}, _Req, _State} = Reply ->
             Reply;
         {Reply, Req1, State1} ->
-            Start = now(),
-            {Data, Req2} = wiggle_handler:encode(Reply, MediaType, Req1),
+            Start = erlang:system_time(micro_seconds),
+            {Data, Req2} = wiggle_h:encode(Reply, MediaType, Req1),
             ?MEx(?P(State), <<"encode">>, Start),
             {Data, Req2, State1#state{obj = Data}}
     end.
@@ -241,7 +241,7 @@ write(Req, ContentType, State = #state{module = M, body = undefined}) ->
             lager:info("This is a raw request"),
             write2(Req, State);
         false ->
-            {ok, Data, Req1} = wiggle_handler:decode(Req, ContentType),
+            {ok, Data, Req1} = wiggle_h:decode(Req, ContentType),
             write1(Req1, State#state{body = Data})
     end;
 
@@ -268,7 +268,7 @@ write2(Req, State = #state{module = M, body = Data}) ->
     case cowboy_req:method(Req) of
         {<<"POST">>, Req1} ->
             R = M:create(Req1, State, Data),
-            wiggle_handler:clear_permissions(State),
+            wiggle_h:clear_permissions(State),
             R;
         {<<"PUT">>, Req1} ->
             M:write(Req1, State, Data)
@@ -279,7 +279,7 @@ write2(Req, State = #state{module = M, body = Data}) ->
 %%--------------------------------------------------------------------
 
 delete_resource(Req, State = #state{module = M, body = undefined}) ->
-    {ok, Data, Req1} = wiggle_handler:decode(Req),
+    {ok, Data, Req1} = wiggle_h:decode(Req),
     case M:delete(Req1, State#state{body = Data}) of
         {N, Req2, State1} when is_number(N) ->
             lager:info("Delete failed with ~p.", [N]),

@@ -1,4 +1,4 @@
--module(wiggle_role_handler).
+-module(wiggle_role_h).
 -include("wiggle.hrl").
 
 -ifdef(TEST).
@@ -17,7 +17,7 @@
          write/3,
          delete/2]).
 
--behaviour(wiggle_rest_handler).
+-behaviour(wiggle_rest_h).
 
 allowed_methods(_Version, _Token, []) ->
     [<<"GET">>, <<"POST">>];
@@ -25,7 +25,7 @@ allowed_methods(_Version, _Token, []) ->
 allowed_methods(_Version, _Token, [?UUID(_Role)]) ->
     [<<"GET">>, <<"PUT">>, <<"DELETE">>];
 
-allowed_methods(_Version, _Token, [?UUID(_Role), <<"permissions">>]) ->
+allowed_methods(?V1, _Token, [?UUID(_Role), <<"permissions">>]) ->
     [<<"GET">>];
 
 allowed_methods(_Version, _Token, [?UUID(_Role), <<"metadata">> | _]) ->
@@ -35,7 +35,7 @@ allowed_methods(_Version, _Token, [?UUID(_Role), <<"permissions">> | _Permission
     [<<"PUT">>, <<"DELETE">>].
 
 get(State = #state{path = [?UUID(Role), <<"permissions">> | Permission]}) ->
-    case {Permission, wiggle_role_handler:get(State#state{path = [?UUID(Role)]})} of
+    case {Permission, wiggle_role_h:get(State#state{path = [?UUID(Role)]})} of
         {_, not_found} ->
             not_found;
         {[], {ok, Obj}} ->
@@ -49,10 +49,10 @@ get(State = #state{path = [?UUID(Role), <<"permissions">> | Permission]}) ->
     end;
 
 get(State = #state{path = [?UUID(Role) | _]}) ->
-    Start = now(),
+    Start = erlang:system_time(micro_seconds),
     R = case application:get_env(wiggle, role_ttl) of
             {ok, {TTL1, TTL2}} ->
-                wiggle_handler:timeout_cache_with_invalid(
+                wiggle_h:timeout_cache_with_invalid(
                   ?CACHE, Role, TTL1, TTL2, not_found,
                   fun() -> ls_role:get(Role) end);
             _ ->
@@ -76,7 +76,8 @@ permission_required(#state{method = <<"PUT">>, path = [?UUID(Role)]}) ->
 permission_required(#state{method = <<"DELETE">>, path = [?UUID(Role)]}) ->
     {ok, [<<"roles">>, Role, <<"delete">>]};
 
-permission_required(#state{method = <<"GET">>, path = [?UUID(Role), <<"permissions">>]}) ->
+permission_required(#state{version = ?V1, method = <<"GET">>,
+                           path = [?UUID(Role), <<"permissions">>]}) ->
     {ok, [<<"roles">>, Role, <<"get">>]};
 
 permission_required(#state{method = <<"PUT">>, path = [?UUID(Role), <<"permissions">> | Permission]}) ->
@@ -102,24 +103,24 @@ permission_required(_State) ->
 
 
 read(Req, State = #state{token = Token, path = [], full_list=FullList, full_list_fields=Filter}) ->
-    Start = now(),
-    {ok, Permissions} = wiggle_handler:get_permissions(Token),
+    Start = erlang:system_time(micro_seconds),
+    {ok, Permissions} = wiggle_h:get_permissions(Token),
     ?MSnarl(?P(State), Start),
-    Start1 = now(),
+    Start1 = erlang:system_time(micro_seconds),
     Permission = [{must, 'allowed',
                    [<<"roles">>, {<<"res">>, <<"uuid">>}, <<"get">>],
                    Permissions}],
-    Res = wiggle_handler:list(fun ls_role:list/2,
-                              fun to_json/1, Token, Permission,
-                              FullList, Filter, role_list_ttl, ?FULL_CACHE,
-                              ?LIST_CACHE),
+    Res = wiggle_h:list(fun ls_role:list/2,
+                        fun to_json/1, Token, Permission,
+                        FullList, Filter, role_list_ttl, ?FULL_CACHE,
+                        ?LIST_CACHE),
     ?MSniffle(?P(State), Start1),
     {Res, Req, State};
 
 read(Req, State = #state{path = [?UUID(_Role)], obj = RoleObj}) ->
     {to_json(RoleObj), Req, State};
 
-read(Req, State = #state{path = [?UUID(_Role), <<"permissions">>], obj = RoleObj}) ->
+read(Req, State = #state{version = ?V1, path = [?UUID(_Role), <<"permissions">>], obj = RoleObj}) ->
     {ft_role:permissions(RoleObj), Req, State}.
 
 %%--------------------------------------------------------------------
@@ -128,7 +129,7 @@ read(Req, State = #state{path = [?UUID(_Role), <<"permissions">>], obj = RoleObj
 
 create(Req, State = #state{path = [], version = Version}, Decoded) ->
     {ok, Role} = jsxd:get(<<"name">>, Decoded),
-    Start = now(),
+    Start = erlang:system_time(micro_seconds),
     {ok, UUID} = ls_role:add(Role),
     e2qc:teardown(?LIST_CACHE),
     ?MSnarl(?P(State), Start),
@@ -139,7 +140,7 @@ write(Req, State = #state{method = <<"POST">>, path = []}, _) ->
     {true, Req, State};
 
 write(Req, State = #state{path = [?UUID(Role), <<"metadata">> | Path]}, [{K, V}]) when is_binary(Role) ->
-    Start = now(),
+    Start = erlang:system_time(micro_seconds),
     e2qc:evict(?CACHE, Role),
     e2qc:teardown(?LIST_CACHE),
     ls_role:set_metadata(Role, [{[<<"public">> | Path] ++ [K], jsxd:from_list(V)}]),
@@ -147,7 +148,7 @@ write(Req, State = #state{path = [?UUID(Role), <<"metadata">> | Path]}, [{K, V}]
     {true, Req, State};
 
 write(Req, State = #state{path = [?UUID(Role), <<"permissions">> | Permission]}, _Body) ->
-    Start = now(),
+    Start = erlang:system_time(micro_seconds),
     e2qc:evict(?CACHE, Role),
     e2qc:teardown(?LIST_CACHE),
     ok = ls_role:grant(Role, Permission),
@@ -159,7 +160,7 @@ write(Req, State = #state{path = [?UUID(Role), <<"permissions">> | Permission]},
 %%--------------------------------------------------------------------
 
 delete(Req, State = #state{path = [?UUID(Role), <<"metadata">> | Path]}) ->
-    Start = now(),
+    Start = erlang:system_time(micro_seconds),
     e2qc:evict(?CACHE, Role),
     e2qc:teardown(?LIST_CACHE),
     ls_role:set_metadata(Role, [{[<<"public">> | Path], delete}]),
@@ -167,7 +168,7 @@ delete(Req, State = #state{path = [?UUID(Role), <<"metadata">> | Path]}) ->
     {true, Req, State};
 
 delete(Req, State = #state{path = [?UUID(Role), <<"permissions">> | Permission]}) ->
-    Start = now(),
+    Start = erlang:system_time(micro_seconds),
     e2qc:evict(?CACHE, Role),
     e2qc:teardown(?LIST_CACHE),
     ok = ls_role:revoke(Role, Permission),
@@ -175,7 +176,7 @@ delete(Req, State = #state{path = [?UUID(Role), <<"permissions">> | Permission]}
     {true, Req, State};
 
 delete(Req, State = #state{path = [?UUID(Role)]}) ->
-    Start = now(),
+    Start = erlang:system_time(micro_seconds),
     e2qc:evict(?CACHE, Role),
     e2qc:teardown(?LIST_CACHE),
     ok = ls_role:delete(Role),

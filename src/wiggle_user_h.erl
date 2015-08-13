@@ -1,7 +1,7 @@
 %% Feel free to use, reuse and abuse the code in this file.
 
 %% @doc Hello world handler.
--module(wiggle_user_handler).
+-module(wiggle_user_h).
 -include("wiggle.hrl").
 
 -ifdef(TEST).
@@ -21,7 +21,7 @@
          delete/2,
          to_json/1]).
 
--behaviour(wiggle_rest_handler).
+-behaviour(wiggle_rest_h).
 
 allowed_methods(_Version, _Token, []) ->
     [<<"GET">>, <<"POST">>];
@@ -32,31 +32,31 @@ allowed_methods(_Version, _Token, [?UUID(_User)]) ->
 allowed_methods(_Version, _Token, [?UUID(_User), <<"metadata">> | _]) ->
     [<<"PUT">>, <<"DELETE">>];
 
-allowed_methods(_Version, _Token, [?UUID(_User), <<"keys">>]) ->
+allowed_methods(?V1, _Token, [?UUID(_User), <<"keys">>]) ->
     [<<"GET">>, <<"PUT">>];
 
 allowed_methods(_Version, _Token, [?UUID(_User), <<"keys">>, _]) ->
     [<<"DELETE">>];
 
-allowed_methods(_Version, _Token, [?UUID(_User), <<"yubikeys">>]) ->
+allowed_methods(?V1, _Token, [?UUID(_User), <<"yubikeys">>]) ->
     [<<"GET">>, <<"PUT">>];
 
 allowed_methods(_Version, _Token, [?UUID(_User), <<"yubikeys">>, _]) ->
     [<<"DELETE">>];
 
-allowed_methods(_Version, _Token, [?UUID(_User), <<"permissions">>]) ->
+allowed_methods(?V2, _Token, [?UUID(_User), <<"permissions">>]) ->
     [<<"GET">>];
 
-allowed_methods(_Version, _Token, [?UUID(_User), <<"permissions">> | _Permission]) ->
+allowed_methods(_, _Token, [?UUID(_User), <<"permissions">> | _Permission]) ->
     [<<"PUT">>, <<"DELETE">>, <<"GET">>];
 
-allowed_methods(_Version, _Token, [?UUID(_User), <<"roles">>]) ->
+allowed_methods(?V1, _Token, [?UUID(_User), <<"roles">>]) ->
     [<<"GET">>];
 
-allowed_methods(_Version, _Token, [?UUID(_User), <<"roles">>, _Role]) ->
+allowed_methods(?V1, _Token, [?UUID(_User), <<"roles">>, _Role]) ->
     [<<"PUT">>, <<"DELETE">>];
 
-allowed_methods(_Version, _Token, [?UUID(_User), <<"orgs">>]) ->
+allowed_methods(?V1, _Token, [?UUID(_User), <<"orgs">>]) ->
     [<<"GET">>];
 
 allowed_methods(_Version, _Token, [?UUID(_User), <<"orgs">>, _Org]) ->
@@ -68,11 +68,11 @@ allowed_methods(_Version, _Token, [?UUID(_User), <<"orgs">>, _Org]) ->
 %% perform permission checks this way.
 get(State = #state{method = <<"GET">>,
                    path = [?UUID(User), <<"permissions">> | _]}) ->
-    wiggle_user_handler:get(State#state{path = [?UUID(User)]});
+    wiggle_user_h:get(State#state{path = [?UUID(User)]});
 
 get(State = #state{path = [?UUID(User), <<"permissions">> | Permission]}) ->
     case {Permission,
-          wiggle_user_handler:get(State#state{path = [?UUID(User)]})} of
+          wiggle_user_h:get(State#state{path = [?UUID(User)]})} of
         {_, not_found} ->
             not_found;
         {[], {ok, Obj}} ->
@@ -88,7 +88,7 @@ get(State = #state{path = [?UUID(User), <<"permissions">> | Permission]}) ->
 
 get(State = #state{method = <<"DELETE">>,
                    path = [?UUID(User), <<"roles">>, Role]}) ->
-    case wiggle_user_handler:get(State#state{path = [?UUID(User)]}) of
+    case wiggle_user_h:get(State#state{path = [?UUID(User)]}) of
         not_found ->
             not_found;
         {ok, Obj} ->
@@ -101,11 +101,11 @@ get(State = #state{method = <<"DELETE">>,
     end;
 
 get(State = #state{method = <<"PUT">>, path = [?UUID(User), <<"roles">>, Role]}) ->
-    case wiggle_user_handler:get(State#state{path = [?UUID(User)]}) of
+    case wiggle_user_h:get(State#state{path = [?UUID(User)]}) of
         not_found ->
             not_found;
         {ok, Obj} ->
-            Start1 = now(),
+            Start1 = erlang:system_time(micro_seconds),
             case ls_role:get(Role) of
                 not_found ->
                     ?MSnarl(?P(State), Start1),
@@ -117,10 +117,10 @@ get(State = #state{method = <<"PUT">>, path = [?UUID(User), <<"roles">>, Role]})
     end;
 
 get(State = #state{path = [?UUID(User) | _]}) ->
-    Start = now(),
+    Start = erlang:system_time(micro_seconds),
     R = case application:get_env(wiggle, user_ttl) of
             {ok, {TTL1, TTL2}} ->
-                wiggle_handler:timeout_cache_with_invalid(
+                wiggle_h:timeout_cache_with_invalid(
                   ?CACHE, User, TTL1, TTL2, not_found,
                   fun() -> ls_user:get(User) end);
             _ ->
@@ -156,7 +156,7 @@ permission_required(#state{method = <<"DELETE">>,
                            path = [?UUID(User), <<"permissions">> | Permission]}) ->
     {multiple, [[<<"users">>, User, <<"revoke">>], Permission]};
 
-permission_required(#state{method = <<"GET">>,
+permission_required(#state{version = ?V1, method = <<"GET">>,
                            path = [?UUID(User), <<"roles">>]}) ->
     {ok, [<<"users">>, User, <<"get">>]};
 
@@ -170,7 +170,7 @@ permission_required(#state{method = <<"DELETE">>,
     {multiple, [[<<"users">>, User, <<"leave">>],
                 [<<"roles">>, Role, <<"leave">>]]};
 
-permission_required(#state{method = <<"GET">>,
+permission_required(#state{version = ?V1, method = <<"GET">>,
                            path = [?UUID(User), <<"orgs">>]}) ->
     {ok, [<<"users">>, User, <<"get">>]};
 
@@ -192,7 +192,7 @@ permission_required(#state{method = <<"DELETE">>,
                            path = [?UUID(User), <<"metadata">> | _]}) ->
     {ok, [<<"users">>, User, <<"edit">>]};
 
-permission_required(#state{method = <<"GET">>,
+permission_required(#state{version = ?V1, method = <<"GET">>,
                            path = [?UUID(User), <<"keys">>]}) ->
     {ok, [<<"users">>, User, <<"get">>]};
 
@@ -204,7 +204,7 @@ permission_required(#state{method = <<"DELETE">>,
                            path = [?UUID(User), <<"keys">>, _KeyID]}) ->
     {ok, [<<"users">>, User, <<"edit">>]};
 
-permission_required(#state{method = <<"GET">>,
+permission_required(#state{version = ?V1, method = <<"GET">>,
                            path = [?UUID(User), <<"yubikeys">>]}) ->
     {ok, [<<"users">>, User, <<"get">>]};
 
@@ -224,17 +224,17 @@ permission_required(_State) ->
 %%--------------------------------------------------------------------
 
 read(Req, State = #state{token = Token, path = [], full_list=FullList, full_list_fields=Filter}) ->
-    Start = now(),
-    {ok, Permissions} = wiggle_handler:get_permissions(Token),
+    Start = erlang:system_time(micro_seconds),
+    {ok, Permissions} = wiggle_h:get_permissions(Token),
     ?MSnarl(?P(State), Start),
-    Start1 = now(),
+    Start1 = erlang:system_time(micro_seconds),
     Permission = [{must, 'allowed',
                    [<<"users">>, {<<"res">>, <<"uuid">>}, <<"get">>],
                    Permissions}],
-    Res = wiggle_handler:list(fun ls_user:list/2,
-                              fun to_json/1, Token, Permission,
-                              FullList, Filter, user_list_ttl, ?FULL_CACHE,
-                              ?LIST_CACHE),
+    Res = wiggle_h:list(fun ls_user:list/2,
+                        fun to_json/1, Token, Permission,
+                        FullList, Filter, user_list_ttl, ?FULL_CACHE,
+                        ?LIST_CACHE),
 
     ?MSnarl(?P(State), Start1),
     {Res, Req, State};
@@ -243,11 +243,12 @@ read(Req, State = #state{path = [_User], obj = UserObj}) ->
     UserObj2 = to_json(UserObj),
     {UserObj2, Req, State};
 
-read(Req, State = #state{path = [_User, <<"permissions">>], obj = UserObj}) ->
+read(Req, State = #state{version = ?V1,
+                         path = [_User, <<"permissions">>], obj = UserObj}) ->
     {ft_user:permissions(UserObj), Req, State};
 
 read(Req, State = #state{path = [User, <<"permissions">> | Permission]}) ->
-    case wiggle_handler:get_permissions(User) of
+    case wiggle_h:get_permissions(User) of
         not_found ->
             {ok, Req1} = cowboy_req:reply(404, Req),
             {halt, Req1, State};
@@ -260,16 +261,20 @@ read(Req, State = #state{path = [User, <<"permissions">> | Permission]}) ->
             end
     end;
 
-read(Req, State = #state{path = [_User, <<"roles">>], obj = UserObj}) ->
+read(Req, State = #state{version = ?V1, obj = UserObj,
+                         path = [_User, <<"roles">>]}) ->
     {ft_user:roles(UserObj), Req, State};
 
-read(Req, State = #state{path = [_User, <<"orgs">>], obj = UserObj}) ->
+read(Req, State = #state{version = ?V1, obj = UserObj,
+                         path = [_User, <<"orgs">>]}) ->
     {ft_user:orgs(UserObj), Req, State};
 
-read(Req, State = #state{path = [_User, <<"keys">>], obj = UserObj}) ->
+read(Req, State = #state{version = ?V1, obj = UserObj,
+                         path = [_User, <<"keys">>]}) ->
     {ft_user:keys(UserObj), Req, State};
 
-read(Req, State = #state{path = [_User, <<"yubikeys">>], obj = UserObj}) ->
+read(Req, State = #state{version = ?V1, obj = UserObj,
+                         path = [_User, <<"yubikeys">>]}) ->
     {ft_user:yubikeys(UserObj), Req, State}.
 
 %%--------------------------------------------------------------------
@@ -281,10 +286,10 @@ create(Req, State = #state{token = Token, path = [], version = Version}, Decoded
     CUUID = ft_user:uuid(Creator),
     {ok, User} = jsxd:get(<<"user">>, Decoded),
     {ok, Pass} = jsxd:get(<<"password">>, Decoded),
-    Start = now(),
+    Start = erlang:system_time(micro_seconds),
     {ok, UUID} = ls_user:add(CUUID, User),
     ?MSnarl(?P(State), Start),
-    Start1 = now(),
+    Start1 = erlang:system_time(micro_seconds),
     ok = ls_user:passwd(UUID, Pass),
     e2qc:teardown(?LIST_CACHE),
     e2qc:teardown(?FULL_CACHE),
@@ -292,7 +297,7 @@ create(Req, State = #state{token = Token, path = [], version = Version}, Decoded
     {{true, <<"/api/", Version/binary, "/users/", UUID/binary>>}, Req, State#state{body = Decoded}}.
 
 write(Req, State = #state{path =  [?UUID(User)]}, [{<<"password">>, Password}]) ->
-    Start = now(),
+    Start = erlang:system_time(micro_seconds),
     ok = ls_user:passwd(User, Password),
     ?MSnarl(?P(State), Start),
     {true, Req, State};
@@ -302,7 +307,7 @@ write(Req, State = #state{method = <<"POST">>, path = []}, _) ->
     {true, Req, State};
 
 write(Req, State = #state{path = [?UUID(User), <<"metadata">> | Path]}, [{K, V}]) ->
-    Start = now(),
+    Start = erlang:system_time(micro_seconds),
     ok = ls_user:set_metadata(User, [{[<<"public">> | Path] ++ [K], jsxd:from_list(V)}]),
     e2qc:evict(?CACHE, User),
     e2qc:teardown(?FULL_CACHE),
@@ -314,7 +319,7 @@ write(Req, State = #state{path = [?UUID(User), <<"keys">>]}, [{KeyID, Key}]) ->
         [_,ID,_] ->
             try
                 base64:decode(ID),
-                Start = now(),
+                Start = erlang:system_time(micro_seconds),
                 ok = ls_user:key_add(User, KeyID, Key),
                 e2qc:evict(?CACHE, User),
                 e2qc:teardown(?FULL_CACHE),
@@ -330,7 +335,7 @@ write(Req, State = #state{path = [?UUID(User), <<"keys">>]}, [{KeyID, Key}]) ->
 
 write(Req, State = #state{path = [?UUID(User), <<"yubikeys">>]},
       [{<<"otp">>, <<_:33/binary, _/binary >>= OTP}]) ->
-    Start = now(),
+    Start = erlang:system_time(micro_seconds),
     ok = ls_user:yubikey_add(User, OTP),
     e2qc:evict(?CACHE, User),
     e2qc:teardown(?FULL_CACHE),
@@ -341,7 +346,7 @@ write(Req, State = #state{path = [_, <<"yubikeys">>]}, _) ->
     {false, Req, State};
 
 write(Req, State = #state{path = [?UUID(User), <<"roles">>, Role]}, _) ->
-    Start = now(),
+    Start = erlang:system_time(micro_seconds),
     ok = ls_user:join(User, Role),
     e2qc:evict(?CACHE, User),
     e2qc:teardown(?FULL_CACHE),
@@ -349,7 +354,7 @@ write(Req, State = #state{path = [?UUID(User), <<"roles">>, Role]}, _) ->
     {true, Req, State};
 
 write(Req, State = #state{path = [?UUID(User), <<"orgs">>, Org]}, []) ->
-    Start = now(),
+    Start = erlang:system_time(micro_seconds),
     ok = ls_user:join_org(User, Org),
     e2qc:evict(?CACHE, User),
     e2qc:teardown(?FULL_CACHE),
@@ -357,7 +362,7 @@ write(Req, State = #state{path = [?UUID(User), <<"orgs">>, Org]}, []) ->
     {true, Req, State};
 
 write(Req, State = #state{path = [?UUID(User), <<"orgs">>, Org]}, [{}]) ->
-    Start = now(),
+    Start = erlang:system_time(micro_seconds),
     ok = ls_user:join_org(User, Org),
     e2qc:evict(?CACHE, User),
     e2qc:teardown(?FULL_CACHE),
@@ -366,7 +371,7 @@ write(Req, State = #state{path = [?UUID(User), <<"orgs">>, Org]}, [{}]) ->
 
 write(Req, State = #state{path = [?UUID(User), <<"orgs">>, Org]},
       [{<<"active">>, true}]) ->
-    Start = now(),
+    Start = erlang:system_time(micro_seconds),
     ok = ls_user:join_org(User, Org),
     ok = ls_user:select_org(User, Org),
     e2qc:evict(?CACHE, User),
@@ -375,7 +380,7 @@ write(Req, State = #state{path = [?UUID(User), <<"orgs">>, Org]},
     {true, Req, State};
 
 write(Req, State = #state{path = [?UUID(User), <<"permissions">> | Permission]}, _) ->
-    Start = now(),
+    Start = erlang:system_time(micro_seconds),
     ok = ls_user:grant(User, Permission),
     e2qc:evict(?CACHE, User),
     e2qc:teardown(?FULL_CACHE),
@@ -388,7 +393,7 @@ write(Req, State = #state{path = [?UUID(User), <<"permissions">> | Permission]},
 %%--------------------------------------------------------------------
 
 delete(Req, State = #state{path = [?UUID(User), <<"metadata">> | Path]}) ->
-    Start = now(),
+    Start = erlang:system_time(micro_seconds),
     ok = ls_user:set_metadata(User, [{[<<"public">> | Path], delete}]),
     e2qc:evict(?CACHE, User),
     e2qc:teardown(?FULL_CACHE),
@@ -396,7 +401,7 @@ delete(Req, State = #state{path = [?UUID(User), <<"metadata">> | Path]}) ->
     {true, Req, State};
 
 delete(Req, State = #state{path = [?UUID(User), <<"keys">>, KeyID]}) ->
-    Start = now(),
+    Start = erlang:system_time(micro_seconds),
     ok = ls_user:key_revoke(User, KeyID),
     e2qc:evict(?CACHE, User),
     e2qc:teardown(?FULL_CACHE),
@@ -404,7 +409,7 @@ delete(Req, State = #state{path = [?UUID(User), <<"keys">>, KeyID]}) ->
     {true, Req, State};
 
 delete(Req, State = #state{path = [?UUID(User), <<"yubikeys">>, KeyID]}) ->
-    Start = now(),
+    Start = erlang:system_time(micro_seconds),
     ok = ls_user:yubikey_remove(User, KeyID),
     e2qc:evict(?CACHE, User),
     e2qc:teardown(?FULL_CACHE),
@@ -416,7 +421,7 @@ delete(Req, State = #state{path = [_User, <<"sessions">>]}) ->
     {true, Req1, State};
 
 delete(Req, State = #state{path = [?UUID(User), <<"permissions">> | Permission]}) ->
-    Start = now(),
+    Start = erlang:system_time(micro_seconds),
     ok = ls_user:revoke(User, Permission),
     e2qc:evict(?CACHE, User),
     e2qc:teardown(?FULL_CACHE),
@@ -424,7 +429,7 @@ delete(Req, State = #state{path = [?UUID(User), <<"permissions">> | Permission]}
     {true, Req, State};
 
 delete(Req, State = #state{path = [?UUID(User)]}) ->
-    Start = now(),
+    Start = erlang:system_time(micro_seconds),
     ok = ls_user:delete(User),
     e2qc:evict(?CACHE, User),
     e2qc:teardown(?LIST_CACHE),
@@ -433,7 +438,7 @@ delete(Req, State = #state{path = [?UUID(User)]}) ->
     {true, Req, State};
 
 delete(Req, State = #state{path = [?UUID(User), <<"orgs">>, Org]}) ->
-    Start = now(),
+    Start = erlang:system_time(micro_seconds),
     ok = ls_user:leave_org(User, Org),
     e2qc:evict(?CACHE, User),
     e2qc:teardown(?FULL_CACHE),
@@ -441,7 +446,7 @@ delete(Req, State = #state{path = [?UUID(User), <<"orgs">>, Org]}) ->
     {true, Req, State};
 
 delete(Req, State = #state{path = [?UUID(User), <<"roles">>, Role]}) ->
-    Start = now(),
+    Start = erlang:system_time(micro_seconds),
     ok = ls_user:leave(User, Role),
     e2qc:evict(?CACHE, User),
     e2qc:teardown(?FULL_CACHE),

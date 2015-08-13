@@ -1,4 +1,4 @@
--module(wiggle_vnc_handler).
+-module(wiggle_vnc_h).
 
 -behaviour(cowboy_websocket_handler).
 
@@ -42,9 +42,9 @@ websocket_init(_Any, Req, []) ->
             e(400, ReqR1);
         _ ->
             {ID, Req1} = cowboy_req:binding(uuid, Req0),
-            Req2 = wiggle_handler:set_access_header(Req1),
+            Req2 = wiggle_h:set_access_header(Req1),
             {#state{token = Token, scope_perms = SPerms}, Req3} =
-                wiggle_handler:get_token(#state{}, Req2),
+                wiggle_h:get_token(#state{}, Req2),
 
             case Token of
                 undefined ->
