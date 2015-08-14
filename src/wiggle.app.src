@@ -6,8 +6,6 @@
   {applications, [
                   kernel,
                   stdlib,
-                  ensq,
-                  ensq_rpc,
                   libsnarl,
                   libsniffle,
                   libchunter,
@@ -21,7 +19,6 @@
                   snmp,
                   mnesia,
                   uuid,
-                  eplugin,
                   e2qc,
                   fifo_s3,
                   fifo_dt,

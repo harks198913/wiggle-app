@@ -14,13 +14,6 @@
 %% ===================================================================
 
 start(_StartType, _StartArgs) ->
-    case (catch eplugin:wait_for_init()) of
-        {'EXIT', Why} ->
-            lager:warning("Error waiting for eplugin init: ~p", [Why]),
-            lager:warning("Your plugins are probably taking too long to load, "
-                          "and some wiggle:dispatchs hooks may not run.");
-        ok -> ok
-    end,
     load_schemas(),
     case application:get_env(wiggle, http_server, true) of
         true ->
@@ -89,7 +82,6 @@ load_schemas() ->
     lager:info("[schemas] Loaded schemas: ~p", [Schemas]).
 
 dispatchs() ->
-    PluginDispatchs = eplugin:fold('wiggle:dispatchs', []),
     API = application:get_env(wiggle, api, all),
     %% OAuth related rules
     [
@@ -145,7 +137,6 @@ dispatchs() ->
             _ ->
                 []
         end ++
-        PluginDispatchs ++
         case application:get_env(wiggle, ui_path) of
             {ok, UIDir} ->
                 [{"/", cowboy_static, {file, filename:join(UIDir, "index.html")}},
