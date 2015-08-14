@@ -15,7 +15,6 @@
                   jesse,
                   lager,
                   lager_watchdog,
-                  mimetypes,
                   snmp,
                   mnesia,
                   uuid,
