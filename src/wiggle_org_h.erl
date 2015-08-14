@@ -28,6 +28,9 @@ allowed_methods(_Version, _Token, [?UUID(_Org)]) ->
 allowed_methods(?V1, _Token, [?UUID(_Org), <<"triggers">>]) ->
     [<<"GET">>];
 
+allowed_methods(?V2, _Token, [?UUID(_Org), <<"accounting">>]) ->
+    [<<"GET">>];
+
 allowed_methods(_Version, _Token, [?UUID(_Org), <<"triggers">> | _Trigger]) ->
     [<<"POST">>, <<"DELETE">>];
 
@@ -57,6 +60,10 @@ permission_required(#state{method = <<"POST">>, path = []}) ->
     {ok, [<<"cloud">>, <<"orgs">>, <<"create">>]};
 
 permission_required(#state{method = <<"GET">>, path = [?UUID(Org)]}) ->
+    {ok, [<<"orgs">>, Org, <<"get">>]};
+
+permission_required(#state{method = <<"GET">>,
+                           path = [?UUID(Org), <<"accounting">>]}) ->
     {ok, [<<"orgs">>, Org, <<"get">>]};
 
 permission_required(#state{method = <<"PUT">>, path = [?UUID(Org)]}) ->
@@ -146,11 +153,27 @@ read(Req, State = #state{token = Token, path = [], full_list=FullList, full_list
 read(Req, State = #state{path = [?UUID(_Org)], obj = OrgObj}) ->
     {to_json(OrgObj), Req, State};
 
+read(Req, State = #state{path = [?UUID(Org), <<"accounting">>]}) ->
+    {QS, Req1} = cowboy_req:qs_vals(Req),
+    case lists:sort(QS) of
+        [{<<"end">>, End}, {<<"start">>, Start}] when Start < End ->
+            {ok, Data} = ls_acc:get(Org, Start, End),
+            {[acc_to_js(E) || E <- Data], Req1, State};
+        _ ->
+            {false, Req1, State}
+    end;
+
 read(Req, State = #state{version = ?V1, path = [?UUID(_Org), <<"triggers">>],
                          obj = OrgObj}) ->
-    %% can't get the ft_role:triggers since the json conversion would miss
     {jsxd:get(<<"triggers">>, [], to_json(OrgObj)), Req, State}.
 
+acc_to_js({Timestamp, Action, Resource, Metadata}) ->
+    [
+     {<<"action">>, atom_to_binary(utf8, Action)},
+     {<<"metadata">>, Metadata},
+     {<<"resource">>, Resource},
+     {<<"timestamp">>, Timestamp}
+    ].
 %%--------------------------------------------------------------------
 %% PUT
 %%--------------------------------------------------------------------
