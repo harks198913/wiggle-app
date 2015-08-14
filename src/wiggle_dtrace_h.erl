@@ -1,4 +1,4 @@
--module(wiggle_dtrace_handler).
+-module(wiggle_dtrace_h).
 -include("wiggle.hrl").
 
 -define(CACHE, dtrace).
@@ -13,7 +13,7 @@
          write/3,
          delete/2]).
 
--behaviour(wiggle_rest_handler).
+-behaviour(wiggle_rest_h).
 
 allowed_methods(_Version, _Token, []) ->
     [<<"GET">>, <<"POST">>];
@@ -25,10 +25,10 @@ allowed_methods(_Version, _Token, [?UUID(_Dtrace)]) ->
     [<<"GET">>, <<"PUT">>, <<"DELETE">>].
 
 get(State = #state{path = [?UUID(Dtrace) | _]}) ->
-    Start = now(),
+    Start = erlang:system_time(micro_seconds),
     R = case application:get_env(wiggle, dtrace_ttl) of
             {ok, {TTL1, TTL2}} ->
-                wiggle_handler:timeout_cache_with_invalid(
+                wiggle_h:timeout_cache_with_invalid(
                   ?CACHE, Dtrace, TTL1, TTL2, not_found,
                   fun() -> ls_dtrace:get(Dtrace) end);
             _ ->
@@ -69,17 +69,17 @@ permission_required(_State) ->
 %%--------------------------------------------------------------------
 
 read(Req, State = #state{token = Token, path = [], full_list=FullList, full_list_fields=Filter}) ->
-    Start = now(),
-    {ok, Permissions} = wiggle_handler:get_permissions(Token),
+    Start = erlang:system_time(micro_seconds),
+    {ok, Permissions} = wiggle_h:get_permissions(Token),
     ?MSnarl(?P(State), Start),
-    Start1 = now(),
+    Start1 = erlang:system_time(micro_seconds),
     Permission = [{must, 'allowed',
                    [<<"dtraces">>, {<<"res">>, <<"uuid">>}, <<"get">>],
                    Permissions}],
-    Res = wiggle_handler:list(fun ls_dtrace:list/2,
-                              fun ft_dtrace:to_json/1, Token, Permission,
-                              FullList, Filter, dtrace_list_ttl, ?FULL_CACHE,
-                              ?LIST_CACHE),
+    Res = wiggle_h:list(fun ls_dtrace:list/2,
+                        fun ft_dtrace:to_json/1, Token, Permission,
+                        FullList, Filter, dtrace_list_ttl, ?FULL_CACHE,
+                        ?LIST_CACHE),
     ?MSniffle(?P(State), Start1),
     {Res, Req, State};
 
@@ -98,7 +98,7 @@ create(Req, State = #state{path = [], version = Version}, Data) ->
     {ok, Dtrace} = jsxd:get(<<"name">>, Data),
     {ok, Script} = jsxd:get(<<"script">>, Data),
     Script1 = binary_to_list(Script),
-    Start = now(),
+    Start = erlang:system_time(micro_seconds),
     case ls_dtrace:add(Dtrace, Script1) of
         {ok, UUID} ->
             e2qc:teardown(?LIST_CACHE),
@@ -106,7 +106,7 @@ create(Req, State = #state{path = [], version = Version}, Data) ->
             ?MSniffle(?P(State), Start),
             case jsxd:get(<<"config">>, Data) of
                 {ok, Config} ->
-                    Start1 = now(),
+                    Start1 = erlang:system_time(micro_seconds),
                     ok = ls_dtrace:set_config(UUID, Config),
                     ?MSniffle(?P(State), Start1);
                 _ ->
@@ -123,7 +123,7 @@ write(Req, State = #state{method = <<"POST">>, path = []}, _) ->
     {true, Req, State};
 
 write(Req, State = #state{path = [?UUID(Dtrace), <<"metadata">> | Path]}, [{K, V}]) ->
-    Start = now(),
+    Start = erlang:system_time(micro_seconds),
     ok = ls_dtrace:set_metadata(Dtrace, [{Path ++ [K], jsxd:from_list(V)}]),
     e2qc:evict(?CACHE, Dtrace),
     e2qc:teardown(?FULL_CACHE),
@@ -138,7 +138,7 @@ write(Req, State, _Body) ->
 %%--------------------------------------------------------------------
 
 delete(Req, State = #state{path = [?UUID(Dtrace), <<"metadata">> | Path]}) ->
-    Start = now(),
+    Start = erlang:system_time(micro_seconds),
     ok = ls_dtrace:set_metadata(Dtrace, [{Path, delete}]),
     e2qc:evict(?CACHE, Dtrace),
     e2qc:teardown(?FULL_CACHE),
@@ -146,7 +146,7 @@ delete(Req, State = #state{path = [?UUID(Dtrace), <<"metadata">> | Path]}) ->
     {true, Req, State};
 
 delete(Req, State = #state{path = [?UUID(Dtrace)]}) ->
-    Start = now(),
+    Start = erlang:system_time(micro_seconds),
     ok = ls_dtrace:delete(Dtrace),
     e2qc:evict(?CACHE, Dtrace),
     e2qc:teardown(?LIST_CACHE),

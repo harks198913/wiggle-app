@@ -1,7 +1,7 @@
 %% Feel free to use, reuse and abuse the code in this file.
 
 %% @doc Hello world handler.
--module(wiggle_network_handler).
+-module(wiggle_network_h).
 -include("wiggle.hrl").
 
 -define(CACHE, network).
@@ -16,7 +16,7 @@
          write/3,
          delete/2]).
 
--behaviour(wiggle_rest_handler).
+-behaviour(wiggle_rest_h).
 
 allowed_methods(_Version, _Token, [?UUID(_Network), <<"metadata">>|_]) ->
     [<<"PUT">>, <<"DELETE">>];
@@ -31,10 +31,10 @@ allowed_methods(_Version, _Token, [?UUID(_Network)]) ->
     [<<"GET">>, <<"PUT">>, <<"DELETE">>].
 
 get(State = #state{path = [?UUID(Network) | _]}) ->
-    Start = now(),
+    Start = erlang:system_time(micro_seconds),
     R = case application:get_env(wiggle, network_ttl) of
             {ok, {TTL1, TTL2}} ->
-                wiggle_handler:timeout_cache_with_invalid(
+                wiggle_h:timeout_cache_with_invalid(
                   ?CACHE, Network, TTL1, TTL2, not_found,
                   fun() -> ls_network:get(Network) end);
             _ ->
@@ -85,17 +85,17 @@ permission_required(_State) ->
 %%--------------------------------------------------------------------
 
 read(Req, State = #state{token = Token, path = [], full_list=FullList, full_list_fields=Filter}) ->
-    Start = now(),
-    {ok, Permissions} = wiggle_handler:get_permissions(Token),
+    Start = erlang:system_time(micro_seconds),
+    {ok, Permissions} = wiggle_h:get_permissions(Token),
     ?MSnarl(?P(State), Start),
-    Start1 = now(),
+    Start1 = erlang:system_time(micro_seconds),
     Permission = [{must, 'allowed',
                    [<<"networks">>, {<<"res">>, <<"uuid">>}, <<"get">>],
                    Permissions}],
-    Res = wiggle_handler:list(fun ls_network:list/2,
-                              fun ft_network:to_json/1, Token, Permission,
-                              FullList, Filter, network_list_ttl, ?FULL_CACHE,
-                              ?LIST_CACHE),
+    Res = wiggle_h:list(fun ls_network:list/2,
+                        fun ft_network:to_json/1, Token, Permission,
+                        FullList, Filter, network_list_ttl, ?FULL_CACHE,
+                        ?LIST_CACHE),
     ?MSniffle(?P(State), Start1),
     {Res, Req, State};
 
@@ -108,7 +108,7 @@ read(Req, State = #state{path = [?UUID(_Network)], obj = Obj}) ->
 
 create(Req, State = #state{path = [], version = Version}, Data) ->
     {ok, Network} = jsxd:get(<<"name">>, Data),
-    Start = now(),
+    Start = erlang:system_time(micro_seconds),
     case ls_network:create(Network) of
         {ok, UUID} ->
             ?MSniffle(?P(State), Start),
@@ -123,7 +123,7 @@ create(Req, State = #state{path = [], version = Version}, Data) ->
 
 write(Req, State = #state{
                       path = [?UUID(Network), <<"ipranges">>, IPrange]}, _Data) ->
-    Start = now(),
+    Start = erlang:system_time(micro_seconds),
     case ls_network:add_iprange(Network, IPrange) of
         ok ->
             ?MSniffle(?P(State), Start),
@@ -139,7 +139,7 @@ write(Req, State = #state{method = <<"POST">>, path = []}, _) ->
     {true, Req, State};
 
 write(Req, State = #state{path = [?UUID(Network), <<"metadata">> | Path]}, [{K, V}]) ->
-    Start = now(),
+    Start = erlang:system_time(micro_seconds),
     ok = ls_network:set_metadata(Network, [{Path ++ [K], jsxd:from_list(V)}]),
     e2qc:evict(?CACHE, Network),
     e2qc:teardown(?FULL_CACHE),
@@ -154,7 +154,7 @@ write(Req, State, _Body) ->
 %%--------------------------------------------------------------------
 
 delete(Req, State = #state{path = [?UUID(Network), <<"metadata">> | Path]}) ->
-    Start = now(),
+    Start = erlang:system_time(micro_seconds),
     ok = ls_network:set_metadata(Network, [{Path, delete}]),
     e2qc:evict(?CACHE, Network),
     e2qc:teardown(?FULL_CACHE),
@@ -162,7 +162,7 @@ delete(Req, State = #state{path = [?UUID(Network), <<"metadata">> | Path]}) ->
     {true, Req, State};
 
 delete(Req, State = #state{path = [?UUID(Network), <<"ipranges">>, IPRange]}) ->
-    Start = now(),
+    Start = erlang:system_time(micro_seconds),
     ok = ls_network:remove_iprange(Network, IPRange),
     e2qc:evict(?CACHE, Network),
     e2qc:teardown(?FULL_CACHE),
@@ -170,7 +170,7 @@ delete(Req, State = #state{path = [?UUID(Network), <<"ipranges">>, IPRange]}) ->
     {true, Req, State};
 
 delete(Req, State = #state{path = [?UUID(Network)]}) ->
-    Start = now(),
+    Start = erlang:system_time(micro_seconds),
     ok = ls_network:delete(Network),
     e2qc:evict(?CACHE, Network),
     e2qc:teardown(?LIST_CACHE),

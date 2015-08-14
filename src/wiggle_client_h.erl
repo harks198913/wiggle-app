@@ -9,7 +9,7 @@
 %%   "uuid":"308f8590-bc66-4f6c-bec5-2ff0c01d063c"
 %% }
 
--module(wiggle_client_handler).
+-module(wiggle_client_h).
 -include("wiggle.hrl").
 
 -ifdef(TEST).
@@ -28,7 +28,7 @@
          write/3,
          delete/2]).
 
--behaviour(wiggle_rest_handler).
+-behaviour(wiggle_rest_h).
 
 allowed_methods(_Version, _Token, []) ->
     [<<"GET">>, <<"POST">>];
@@ -49,10 +49,10 @@ allowed_methods(_Version, _Token, [?UUID(_Client), <<"metadata">> | _]) ->
     [<<"PUT">>, <<"DELETE">>].
 
 get(State = #state{path = [?UUID(Client) | _]}) ->
-    Start = now(),
+    Start = erlang:system_time(micro_seconds),
     R = case application:get_env(wiggle, client_ttl) of
             {ok, {TTL1, TTL2}} ->
-                wiggle_handler:timeout_cache_with_invalid(
+                wiggle_h:timeout_cache_with_invalid(
                   ?CACHE, Client, TTL1, TTL2, not_found,
                   fun() -> ls_client:get(Client) end);
             _ ->
@@ -103,17 +103,17 @@ permission_required(_State) ->
 %%--------------------------------------------------------------------
 
 read(Req, State = #state{token = Token, path = [], full_list=FullList, full_list_fields=Filter}) ->
-    Start = now(),
-    {ok, Permissions} = wiggle_handler:get_permissions(Token),
+    Start = erlang:system_time(micro_seconds),
+    {ok, Permissions} = wiggle_h:get_permissions(Token),
     ?MSnarl(?P(State), Start),
-    Start1 = now(),
+    Start1 = erlang:system_time(micro_seconds),
     Permission = [{must, 'allowed',
                    [<<"clients">>, {<<"res">>, <<"uuid">>}, <<"get">>],
                    Permissions}],
-    Res = wiggle_handler:list(fun ls_client:list/2,
-                              fun to_json/1, Token, Permission,
-                              FullList, Filter, client_list_ttl, ?FULL_CACHE,
-                              ?LIST_CACHE),
+    Res = wiggle_h:list(fun ls_client:list/2,
+                        fun to_json/1, Token, Permission,
+                        FullList, Filter, client_list_ttl, ?FULL_CACHE,
+                        ?LIST_CACHE),
 
     ?MSnarl(?P(State), Start1),
     {Res, Req, State};
@@ -131,10 +131,10 @@ create(Req, State = #state{token = Token, path = [], version = Version}, Decoded
     CUUID = ft_user:uuid(Creator),
     {ok, Client} = jsxd:get(<<"client">>, Decoded),
     {ok, Pass} = jsxd:get(<<"secret">>, Decoded),
-    Start = now(),
+    Start = erlang:system_time(micro_seconds),
     {ok, UUID} = ls_client:add(CUUID, Client),
     ?MSnarl(?P(State), Start),
-    Start1 = now(),
+    Start1 = erlang:system_time(micro_seconds),
     ok = ls_client:secret(UUID, Pass),
     e2qc:teardown(?LIST_CACHE),
     e2qc:teardown(?FULL_CACHE),
@@ -142,13 +142,13 @@ create(Req, State = #state{token = Token, path = [], version = Version}, Decoded
     {{true, <<"/api/", Version/binary, "/clients/", UUID/binary>>}, Req, State#state{body = Decoded}}.
 
 write(Req, State = #state{path =  [?UUID(Client)]}, [{<<"secret">>, Secret}]) ->
-    Start = now(),
+    Start = erlang:system_time(micro_seconds),
     ok = ls_client:secret(Client, Secret),
     ?MSnarl(?P(State), Start),
     {true, Req, State};
 
 write(Req, State = #state{path = [?UUID(Client), <<"metadata">> | Path]}, [{K, V}]) ->
-    Start = now(),
+    Start = erlang:system_time(micro_seconds),
     ok = ls_client:set_metadata(Client, [{[<<"public">> | Path] ++ [K], jsxd:from_list(V)}]),
     e2qc:evict(?CACHE, Client),
     e2qc:teardown(?FULL_CACHE),
@@ -160,7 +160,7 @@ write(Req, State = #state{path = [?UUID(Client), <<"metadata">> | Path]}, [{K, V
 %%--------------------------------------------------------------------
 
 delete(Req, State = #state{path = [?UUID(Client), <<"metadata">> | Path]}) ->
-    Start = now(),
+    Start = erlang:system_time(micro_seconds),
     ok = ls_client:set_metadata(Client, [{[<<"public">> | Path], delete}]),
     e2qc:evict(?CACHE, Client),
     e2qc:teardown(?FULL_CACHE),
@@ -169,7 +169,7 @@ delete(Req, State = #state{path = [?UUID(Client), <<"metadata">> | Path]}) ->
 
 
 delete(Req, State = #state{path = [?UUID(Client)]}) ->
-    Start = now(),
+    Start = erlang:system_time(micro_seconds),
     ok = ls_client:delete(Client),
     e2qc:evict(?CACHE, Client),
     e2qc:teardown(?LIST_CACHE),

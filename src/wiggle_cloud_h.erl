@@ -1,4 +1,4 @@
--module(wiggle_cloud_handler).
+-module(wiggle_cloud_h).
 
 -include("wiggle_version.hrl").
 -include("wiggle.hrl").

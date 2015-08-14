@@ -37,7 +37,7 @@ websocket_init(_Any, Req, []) ->
                             {P, cowboy_req:set_resp_header(<<"sec-websocket-protocol">>, P, ReqR)}
                     end,
     {ID, Req1} = cowboy_req:binding(uuid, Req0),
-    Req2 = wiggle_handler:set_access_header(Req1),
+    Req2 = wiggle_h:set_access_header(Req1),
     {Encoder, Decoder, Type} = case Proto of
                                    <<"msgpack">> ->
                                        {fun(O) ->
@@ -56,7 +56,7 @@ websocket_init(_Any, Req, []) ->
                                                 jsxd:from_list(jsx:decode(D))
                                         end, text}
                                end,
-    case wiggle_handler:get_token(#state{}, Req2) of
+    case wiggle_h:get_token(#state{}, Req2) of
         {#state{ token = undefined}, Req3} ->
             {ok, Req3, #dstate{id = ID, encoder = Encoder, decoder = Decoder,
                                type = Type}};
@@ -116,7 +116,7 @@ auth([{<<"bearer">>, Bearer}], State) ->
                 {undefined, _} ->
                     {error, State};
                 {UUID, Scope} ->
-                    SPerms = wiggle_handler:scope_perms(ls_oauth:scope(Scope), []),
+                    SPerms = wiggle_h:scope_perms(ls_oauth:scope(Scope), []),
                     State1 = State#dstate{token = UUID, scope_perms = SPerms},
                     {ok, State1}
             end;
@@ -161,7 +161,7 @@ handle(Config, Req, State  = #dstate{encoder = Enc, type = Type,
     lager:debug("[dtrace] handle(~p)", [Config]),
     case update_vms(Config, State) of
         {ok, Config1} ->
-            {ok, Permissions} = wiggle_handler:get_persmissions(Token),
+            {ok, Permissions} = wiggle_h:get_permissions(Token),
             Permission = [{must, 'allowed',
                            [<<"hypervisors">>, {<<"res">>, <<"uuid">>}, <<"get">>],
                            Permissions}],

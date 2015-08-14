@@ -1,7 +1,7 @@
 %% Feel free to use, reuse and abuse the code in this file.
 
 %% @doc Hello world handler.
--module(wiggle_dataset_handler).
+-module(wiggle_dataset_h).
 
 -include("wiggle.hrl").
 -define(CACHE, dataset).
@@ -13,7 +13,7 @@
 -include_lib("eunit/include/eunit.hrl").
 -endif.
 
--behaviour(wiggle_rest_handler).
+-behaviour(wiggle_rest_h).
 
 -export([allowed_methods/3,
          get/1,
@@ -54,10 +54,10 @@ allowed_methods(_Version, _Token, [?UUID(_Dataset), <<"metadata">>|_]) ->
     [<<"PUT">>, <<"DELETE">>].
 
 get(State = #state{path = [?UUID(Dataset) | _]}) ->
-    Start = now(),
+    Start = erlang:system_time(micro_seconds),
     R = case application:get_env(wiggle, dataset_ttl) of
             {ok, {TTL1, TTL2}} ->
-                wiggle_handler:timeout_cache_with_invalid(
+                wiggle_h:timeout_cache_with_invalid(
                   ?CACHE, Dataset, TTL1, TTL2, not_found,
                   fun() -> ls_dataset:get(Dataset) end);
             _ ->
@@ -68,7 +68,6 @@ get(State = #state{path = [?UUID(Dataset) | _]}) ->
 
 get(_State) ->
     not_found.
-
 
 permission_required(#state{method = <<"POST">>, path = []}) ->
     {ok, [<<"cloud">>, <<"datasets">>, <<"create">>]};
@@ -132,31 +131,31 @@ content_types_accepted(#state{path=[_, <<"dataset.gz">>], method = <<"PUT">>}) -
      {{<<"application">>, <<"x-gzip">>, '*'}, write}
     ];
 content_types_accepted(_) ->
-    wiggle_handler:accepted().
+    wiggle_h:accepted().
 
 content_types_provided(#state{path=[_, <<"dataset.gz">>], method = <<"GET">>}) ->
     [
      {{<<"application">>, <<"x-gzip">>, []}, read}
     ];
 content_types_provided(_) ->
-    wiggle_handler:provided().
+    wiggle_h:provided().
 
 %%--------------------------------------------------------------------
 %% GET
 %%--------------------------------------------------------------------
 
 read(Req, State = #state{token = Token, path = [], full_list=FullList, full_list_fields=Filter}) ->
-    Start = now(),
-    {ok, Permissions} = wiggle_handler:get_permissions(Token),
+    Start = erlang:system_time(micro_seconds),
+    {ok, Permissions} = wiggle_h:get_permissions(Token),
     ?MSnarl(?P(State), Start),
-    Start1 = now(),
+    Start1 = erlang:system_time(micro_seconds),
     Permission = [{must, 'allowed',
                    [<<"datasets">>, {<<"res">>, <<"uuid">>}, <<"get">>],
                    Permissions}],
-    Res = wiggle_handler:list(fun ls_dataset:list/2,
-                              fun ft_dataset:to_json/1, Token, Permission,
-                              FullList, Filter, dataset_list_ttl, ?FULL_CACHE,
-                              ?LIST_CACHE),
+    Res = wiggle_h:list(fun ls_dataset:list/2,
+                        fun ft_dataset:to_json/1, Token, Permission,
+                        FullList, Filter, dataset_list_ttl, ?FULL_CACHE,
+                        ?LIST_CACHE),
 
     ?MSniffle(?P(State), Start1),
     {Res, Req, State};
@@ -201,14 +200,14 @@ create(Req, State = #state{path = [], version = Version}, Decoded) ->
     e2qc:teardown(?FULL_CACHE),
     case jsxd:from_list(Decoded) of
         [{<<"url">>, URL}] ->
-            Start = now(),
+            Start = erlang:system_time(micro_seconds),
             {ok, UUID} = ls_dataset:import(URL),
             ?MSniffle(?P(State), Start),
             {{true, <<"/api/", Version/binary, "/datasets/", UUID/binary>>}, Req, State#state{body = Decoded}};
         [{<<"config">>, Config},
          {<<"snapshot">>, Snap},
          {<<"vm">>, Vm}] ->
-            Start1 = now(),
+            Start1 = erlang:system_time(micro_seconds),
             {ok, UUID} = ls_vm:promote_snapshot(Vm, Snap, Config),
             ?MSniffle(?P(State), Start1),
             {{true, <<"/api/", Version/binary, "/datasets/", UUID/binary>>}, Req, State#state{body = Decoded}}
@@ -230,7 +229,7 @@ write(Req, State = #state{path = [UUID, <<"dataset.gz">>]}, _) ->
     end;
 
 write(Req, State = #state{path = [?UUID(Dataset), <<"metadata">> | Path]}, [{K, V}]) ->
-    Start = now(),
+    Start = erlang:system_time(micro_seconds),
     ok = ls_dataset:set_metadata(Dataset, [{Path ++ [K], jsxd:from_list(V)}]),
     e2qc:evict(?CACHE, Dataset),
     e2qc:teardown(?FULL_CACHE),
@@ -240,9 +239,9 @@ write(Req, State = #state{path = [?UUID(Dataset), <<"metadata">> | Path]}, [{K, 
 write(Req, State = #state{path = [?UUID(Dataset), <<"networks">>, NIC],
                           obj = Obj, version = <<"0.2.0">>},
       [{<<"description">>, Desc}]) ->
-    Start = now(),
+    Start = erlang:system_time(micro_seconds),
     [ls_dataset:remove_network(Dataset, E) || E = {_NIC, _} <- ft_dataset:networks(Obj),
-                                          _NIC =:= NIC],
+                                              _NIC =:= NIC],
     ls_dataset:add_network(Dataset, {NIC, Desc}),
     e2qc:evict(?CACHE, Dataset),
     e2qc:teardown(?FULL_CACHE),
@@ -252,7 +251,7 @@ write(Req, State = #state{path = [?UUID(Dataset), <<"networks">>, NIC],
 
 write(Req, State = #state{path = [?UUID(Dataset), <<"networks">>],
                           version = <<"0.1.0">>}, Data) ->
-    Start = now(),
+    Start = erlang:system_time(micro_seconds),
     Nets =
         ordsets:from_list(
           [{Name, Desc} ||
@@ -269,7 +268,7 @@ write(Req, State = #state{path = [?UUID(Dataset), <<"networks">>],
     {true, Req, State};
 
 write(Req, State = #state{path = [?UUID(_Dataset)]}, [{_K, _V}]) ->
-    %%Start = now(),
+    %%Start = erlang:system_time(micro_seconds),
     %% TODO: Cut this down in smaller pices.
     %%ok = libsniffle:dataset_set(Dataset, [K], jsxd:from_list(V)),
     %%e2qc:evict(?CACHE, Dataset),
@@ -288,7 +287,7 @@ write(Req, State, _Body) ->
 %%--------------------------------------------------------------------
 
 delete(Req, State = #state{path = [?UUID(Dataset), <<"metadata">> | Path]}) ->
-    Start = now(),
+    Start = erlang:system_time(micro_seconds),
     ok = ls_dataset:set_metadata(Dataset, [{Path, delete}]),
     e2qc:evict(?CACHE, Dataset),
     e2qc:teardown(?FULL_CACHE),
@@ -296,7 +295,7 @@ delete(Req, State = #state{path = [?UUID(Dataset), <<"metadata">> | Path]}) ->
     {true, Req, State};
 
 delete(Req, State = #state{path = [?UUID(Dataset)]}) ->
-    Start = now(),
+    Start = erlang:system_time(micro_seconds),
     case ls_dataset:get(Dataset) of
         {ok, D} ->
             case ft_dataset:status(D) of

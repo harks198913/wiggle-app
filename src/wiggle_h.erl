@@ -1,4 +1,4 @@
--module(wiggle_handler).
+-module(wiggle_h).
 
 -include("wiggle.hrl").
 
@@ -23,7 +23,7 @@
         ]).
 
 allowed(State=#state{scope_perms = SP}, Permission) ->
-    Start = now(),
+    Start = erlang:system_time(micro_seconds),
     R = libsnarlmatch:test_perms(Permission, SP)
         andalso allowed_tkn(Permission, State),
     ?MSnarl(?P(State), Start),
@@ -44,15 +44,26 @@ allowed_tkn(Perm, #state{token = Token}) ->
 initial_state(Req) ->
     {Method, Req0} = cowboy_req:method(Req),
     {Version, Req1} = cowboy_req:binding(version, Req0),
+    VersionI = case Version of
+                   ?V1 -> 1;
+                   _ ->
+                       try
+                           binary_to_integer(Version)
+                       catch
+                           _:_ ->
+                               0
+                       end
+               end,
     {Path, Req2} = cowboy_req:path_info(Req1),
     {PathB, Req3} = cowboy_req:path(Req2),
     {FullList, Req4} = full_list(Req3),
     {FullListFields, Req5} = full_list_fields(Req4),
     State =  #state{
                 version = Version,
+                version_i = VersionI,
                 method = Method,
                 path = Path,
-                start = now(),
+                start = erlang:system_time(micro_seconds),
                 path_bin = PathB,
                 full_list = FullList,
                 full_list_fields = FullListFields
@@ -288,9 +299,9 @@ timeout_cache(Cache, Value, TTL1, TTL2, Fun) ->
     end.
 
 timeout_cache_(Cache, Value, TTL1, TTL2, Fun) ->
-    CacheFun = fun() -> {now(), Fun()} end,
+    CacheFun = fun() -> {erlang:system_time(milli_seconds), Fun()} end,
     {T0, R} = e2qc:cache(Cache, Value, CacheFun),
-    case timer:now_diff(now(), T0)/1000 of
+    case T0 - erlang:system_time(milli_seconds) of
         Diff when Diff < TTL1 ->
             R;
         Diff when Diff < TTL2 ->

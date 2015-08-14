@@ -7,6 +7,7 @@
           method,
           %% The API version
           version,
+          version_i,
           %% The token (either {token, ...} or user uuid)
           token,
           %% The object the reuqest is asking for (from the DB)
@@ -36,7 +37,7 @@
 -define(P(State), State#state.path_bin).
 -define(MEx(Path, Service, Start), io_lib:format("~p~p", [Path, Start])).
 %%-define(MEx(Path, Service, Start),
-%%        statman_histogram:record_value({Path, {ext, Service}}, Start)).
+%%        statman_histogram:record_value({Path, {ext, Service}}, Start - erlang:system_time(micro_seconds))).
 -define(MSnarl(Path, Start), ?MEx(Path, <<"snarl">>, Start)).
 -define(MSniffle(Path, Start), ?MEx(Path, <<"sniffle">>, Start)).
 -define(MHowl(Path, Start), ?MEx(Path, <<"howl">>, Start)).
@@ -47,4 +48,4 @@
 %-define(M(Path, Start), statman_histogram:record_value({Path, total}, Start)).
 
 -define(V1, <<"0.1.0">>).
--define(V2, <<"0.2.0">>).
+-define(V2, <<"2">>).

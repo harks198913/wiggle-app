@@ -1,7 +1,7 @@
 %% Feel free to use, reuse and abuse the code in this file.
 
 %% @doc Hello world handler.
--module(wiggle_grouping_handler).
+-module(wiggle_grouping_h).
 -include("wiggle.hrl").
 
 -define(CACHE, grouping).
@@ -16,7 +16,7 @@
          write/3,
          delete/2]).
 
--behaviour(wiggle_rest_handler).
+-behaviour(wiggle_rest_h).
 
 allowed_methods(_Version, _Token, [?UUID(_Grouping), <<"metadata">>|_]) ->
     [<<"PUT">>, <<"DELETE">>];
@@ -37,10 +37,10 @@ allowed_methods(_Version, _Token, [?UUID(_Grouping)]) ->
     [<<"GET">>, <<"PUT">>, <<"DELETE">>].
 
 get(State = #state{path = [?UUID(Grouping) | _]}) ->
-    Start = now(),
+    Start = erlang:system_time(micro_seconds),
     R = case application:get_env(wiggle, grouping_ttl) of
             {ok, {TTL1, TTL2}} ->
-                wiggle_handler:timeout_cache_with_invalid(
+                wiggle_h:timeout_cache_with_invalid(
                   ?CACHE, Grouping, TTL1, TTL2, not_found,
                   fun() -> ls_grouping:get(Grouping) end);
             _ ->
@@ -107,17 +107,17 @@ permission_required(_State) ->
 %%--------------------------------------------------------------------
 
 read(Req, State = #state{token = Token, path = [], full_list=FullList, full_list_fields=Filter}) ->
-    Start = now(),
-    {ok, Permissions} = wiggle_handler:get_permissions(Token),
+    Start = erlang:system_time(micro_seconds),
+    {ok, Permissions} = wiggle_h:get_permissions(Token),
     ?MSnarl(?P(State), Start),
-    Start1 = now(),
+    Start1 = erlang:system_time(micro_seconds),
     Permission = [{must, 'allowed',
                    [<<"groupings">>, {<<"res">>, <<"uuid">>}, <<"get">>],
                    Permissions}],
-    Res = wiggle_handler:list(fun ls_grouping:list/2,
-                              fun ft_grouping:to_json/1, Token, Permission,
-                              FullList, Filter, grouping_list_ttl, ?FULL_CACHE,
-                              ?LIST_CACHE),
+    Res = wiggle_h:list(fun ls_grouping:list/2,
+                        fun ft_grouping:to_json/1, Token, Permission,
+                        FullList, Filter, grouping_list_ttl, ?FULL_CACHE,
+                        ?LIST_CACHE),
     ?MSniffle(?P(State), Start1),
     {Res, Req, State};
 
@@ -138,7 +138,7 @@ create(Req, State = #state{path = [], version = Version, token=Token},
                _ ->
                    none
            end,
-    Start = now(),
+    Start = erlang:system_time(micro_seconds),
     case ls_grouping:add(Name, Type) of
         {ok, UUID} ->
             e2qc:teardown(?LIST_CACHE),
@@ -160,7 +160,7 @@ create(Req, State = #state{path = [], version = Version, token=Token},
 
 write(Req, State = #state{
                       path = [?UUID(Grouping), <<"elements">>, IPrange]}, _Data) ->
-    Start = now(),
+    Start = erlang:system_time(micro_seconds),
     case ls_grouping:add_element(Grouping, IPrange) of
         ok ->
             e2qc:evict(?CACHE, Grouping),
@@ -174,7 +174,7 @@ write(Req, State = #state{
 
 write(Req, State = #state{
                       path = [?UUID(Grouping), <<"groupings">>, IPrange]}, _Data) ->
-    Start = now(),
+    Start = erlang:system_time(micro_seconds),
     case ls_grouping:add_grouping(Grouping, IPrange) of
         ok ->
             e2qc:evict(?CACHE, Grouping),
@@ -190,7 +190,7 @@ write(Req, State = #state{method = <<"POST">>, path = []}, _) ->
     {true, Req, State};
 
 write(Req, State = #state{path = [?UUID(Grouping), <<"metadata">> | Path]}, [{K, V}]) ->
-    Start = now(),
+    Start = erlang:system_time(micro_seconds),
     ok = ls_grouping:set_metadata(Grouping, [{Path ++ [K], jsxd:from_list(V)}]),
     e2qc:evict(?CACHE, Grouping),
     e2qc:teardown(?FULL_CACHE),
@@ -198,7 +198,7 @@ write(Req, State = #state{path = [?UUID(Grouping), <<"metadata">> | Path]}, [{K,
     {true, Req, State};
 
 write(Req, State = #state{path = [?UUID(Grouping), <<"config">> | Path]}, [{K, V}]) ->
-    Start = now(),
+    Start = erlang:system_time(micro_seconds),
     ok = ls_grouping:set_config(Grouping, [{Path ++ [K], jsxd:from_list(V)}]),
     e2qc:evict(?CACHE, Grouping),
     e2qc:teardown(?FULL_CACHE),
@@ -213,7 +213,7 @@ write(Req, State, _Body) ->
 %%--------------------------------------------------------------------
 
 delete(Req, State = #state{path = [?UUID(Grouping), <<"metadata">> | Path]}) ->
-    Start = now(),
+    Start = erlang:system_time(micro_seconds),
     ok = ls_grouping:set_metadata(Grouping, [{Path, delete}]),
     e2qc:evict(?CACHE, Grouping),
     e2qc:teardown(?FULL_CACHE),
@@ -221,7 +221,7 @@ delete(Req, State = #state{path = [?UUID(Grouping), <<"metadata">> | Path]}) ->
     {true, Req, State};
 
 delete(Req, State = #state{path = [?UUID(Grouping), <<"config">> | Path]}) ->
-    Start = now(),
+    Start = erlang:system_time(micro_seconds),
     ok = ls_grouping:set_config(Grouping, [{Path, delete}]),
     e2qc:evict(?CACHE, Grouping),
     e2qc:teardown(?FULL_CACHE),
@@ -229,7 +229,7 @@ delete(Req, State = #state{path = [?UUID(Grouping), <<"config">> | Path]}) ->
     {true, Req, State};
 
 delete(Req, State = #state{path = [?UUID(Grouping), <<"elements">>, Element]}) ->
-    Start = now(),
+    Start = erlang:system_time(micro_seconds),
     ok = ls_grouping:remove_element(Grouping, Element),
     e2qc:evict(?CACHE, Grouping),
     e2qc:teardown(?FULL_CACHE),
@@ -237,7 +237,7 @@ delete(Req, State = #state{path = [?UUID(Grouping), <<"elements">>, Element]}) -
     {true, Req, State};
 
 delete(Req, State = #state{path = [?UUID(Grouping), <<"groupings">>, Element]}) ->
-    Start = now(),
+    Start = erlang:system_time(micro_seconds),
     ok = ls_grouping:remove_grouping(Grouping, Element),
     e2qc:evict(?CACHE, Grouping),
     e2qc:teardown(?FULL_CACHE),
@@ -245,7 +245,7 @@ delete(Req, State = #state{path = [?UUID(Grouping), <<"groupings">>, Element]}) 
     {true, Req, State};
 
 delete(Req, State = #state{path = [?UUID(Grouping)]}) ->
-    Start = now(),
+    Start = erlang:system_time(micro_seconds),
     ok = ls_grouping:delete(Grouping),
     e2qc:evict(?CACHE, Grouping),
     e2qc:teardown(?LIST_CACHE),
