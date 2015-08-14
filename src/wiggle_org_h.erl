@@ -171,7 +171,7 @@ read(Req, State = #state{version = ?V1, path = [?UUID(_Org), <<"triggers">>],
 
 acc_to_js({Timestamp, Action, Resource, Metadata}) ->
     [
-     {<<"action">>, atom_to_binary(utf8, Action)},
+     {<<"action">>, atom_to_binary(Action, utf8)},
      {<<"metadata">>, Metadata},
      {<<"resource">>, Resource},
      {<<"timestamp">>, Timestamp}
