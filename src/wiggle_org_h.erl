@@ -156,7 +156,9 @@ read(Req, State = #state{path = [?UUID(_Org)], obj = OrgObj}) ->
 read(Req, State = #state{path = [?UUID(Org), <<"accounting">>]}) ->
     {QS, Req1} = cowboy_req:qs_vals(Req),
     case lists:sort(QS) of
-        [{<<"end">>, End}, {<<"start">>, Start}] when Start < End ->
+        [{<<"end">>, EndB}, {<<"start">>, StartB}] ->
+            Start = binary_to_integer(StartB),
+            End = binary_to_integer(EndB),
             {ok, Data} = ls_acc:get(Org, Start, End),
             {[acc_to_js(E) || E <- Data], Req1, State};
         _ ->
