@@ -112,19 +112,19 @@ read(Req, State = #state{path = [?UUID(_Iprange)], obj = Obj}) ->
     {to_json(Obj), Req, State}.
 
 to_json(Obj) ->
-    jsxd:thread([{update, <<"network">>, fun ip_to_str/1},
-                 {update, <<"gateway">>, fun ip_to_str/1},
-                 {update, <<"netmask">>, fun ip_to_str/1},
+    jsxd:thread([{update, <<"network">>, fun ls_iprange:ip_to_bin/1},
+                 {update, <<"gateway">>, fun ls_iprange:ip_to_bin/1},
+                 {update, <<"netmask">>, fun ls_iprange:ip_to_bin/1},
                  {update, <<"free">>,
                   fun (Free) ->
-                          lists:map(fun ip_to_str/1, Free)
+                          lists:map(fun ls_iprange:ip_to_bin/1, Free)
                   end},
                  {update, <<"used">>,
                   fun (Free) ->
-                          lists:map(fun ip_to_str/1, Free)
+                          lists:map(fun ls_iprange:ip_to_bin/1, Free)
                   end}], ft_iprange:to_json(Obj)).
 %%--------------------------------------------------------------------
-%% PUT
+%% POST
 %%--------------------------------------------------------------------
 
 create(Req, State = #state{path = [], version = Version}, Data) ->
@@ -142,16 +142,46 @@ create(Req, State = #state{path = [], version = Version}, Data) ->
             ?MSniffle(?P(State), Start),
             e2qc:teardown(?LIST_CACHE),
             e2qc:teardown(?FULL_CACHE),
-            {{true, <<"/api/", Version/binary, "/ipranges/", UUID/binary>>}, Req, State#state{body = Data}};
+            {{true, <<"/api/", Version/binary, "/ipranges/", UUID/binary>>},
+             Req, State#state{body = Data}};
         duplicate ->
             ?MSniffle(?P(State), Start),
             {ok, Req1} = cowboy_req:reply(409, Req),
             {halt, Req1, State}
     end.
 
+%%--------------------------------------------------------------------
+%% PUT
+%%--------------------------------------------------------------------
+
 %% TODO : This is a icky case it is called after post.
-write(Req, State = #state{method = <<"POST">>, path = []}, _) ->
-    {true, Req, State};
+write(Req, State = #state{path = [?UUID(Iprange)]}, _) ->
+    case ls_iprange:claim(Iprange) of
+        {ok, {Tag, IP, Netmask, Gateway, VLAN}} ->
+            JSON = [
+                    {tag, Tag},
+                    {ip, ls_iprange:ip_to_bin(IP)},
+                    {netmask, ls_iprange:ip_to_bin(Netmask)},
+                    {gateway, ls_iprange:ip_to_bin(Gateway)},
+                    {vlan, VLAN}
+                    ],
+            {Encoder, ContentType, Req2} =
+                case cowboy_req:header(<<"accept">>, Req) of
+                    {<<"applicaiton/json", _/binary>>, Req1} ->
+                        {fun jsx:encode/1,
+                         <<"applicaiton/json">>, Req1};
+                    {<<"applicaiton/x-msgpack", _/binary>>, Req1} ->
+                        {fun (Body) -> msgpack:pack(Body, [jsx]) end,
+                         <<"applicaiton/x-msgpack">>, Req1}
+                end,
+            Body = Encoder(JSON),
+            {ok, Req3} =
+                cowboy_req:reply(
+                  200, [{<<"content-type">>, ContentType}], Body, Req2),
+            {halt, Req3, State};
+        _ ->
+            {true, Req, State}
+    end;
 
 write(Req, State = #state{path = [?UUID(Iprange), <<"metadata">> | Path]}, [{K, V}]) ->
     Start = erlang:system_time(micro_seconds),
@@ -176,6 +206,17 @@ delete(Req, State = #state{path = [?UUID(Iprange), <<"metadata">> | Path]}) ->
     ?MSniffle(?P(State), Start),
     {true, Req, State};
 
+
+delete(Req, State = #state{path = [?UUID(Iprange), IPS]}) ->
+    Start = erlang:system_time(micro_seconds),
+    IP = ls_iprange:ip_to_int(IPS),
+    ok = ls_iprange:release(Iprange, IP),
+    e2qc:evict(?CACHE, Iprange),
+    e2qc:teardown(?LIST_CACHE),
+    e2qc:teardown(?FULL_CACHE),
+    ?MSniffle(?P(State), Start),
+    {true, Req, State};
+
 delete(Req, State = #state{path = [?UUID(Iprange)]}) ->
     Start = erlang:system_time(micro_seconds),
     e2qc:evict(?CACHE, Iprange),
@@ -184,7 +225,3 @@ delete(Req, State = #state{path = [?UUID(Iprange)]}) ->
     ok = ls_iprange:delete(Iprange),
     ?MSniffle(?P(State), Start),
     {true, Req, State}.
-
-ip_to_str(Ip) ->
-    <<A:8, B:8, C:8, D:8>> = <<Ip:32>>,
-    list_to_binary(io_lib:format("~p.~p.~p.~p", [A, B, C, D])).
