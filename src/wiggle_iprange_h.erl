@@ -25,7 +25,10 @@ allowed_methods(_Version, _Token, []) ->
     [<<"GET">>, <<"POST">>];
 
 allowed_methods(_Version, _Token, [?UUID(_Iprange)]) ->
-    [<<"GET">>, <<"PUT">>, <<"DELETE">>].
+    [<<"GET">>, <<"PUT">>, <<"DELETE">>];
+
+allowed_methods(_Version, _Token, [?UUID(_Iprange), _IP]) ->
+    [<<"DELETE">>].
 
 get(State = #state{path = [?UUID(Iprange) | _]}) ->
     Start = erlang:system_time(micro_seconds),
@@ -55,8 +58,8 @@ permission_required(#state{method = <<"GET">>, path = [?UUID(Iprange)]}) ->
 permission_required(#state{method = <<"DELETE">>, path = [?UUID(Iprange)]}) ->
     {ok, [<<"ipranges">>, Iprange, <<"delete">>]};
 
-permission_required(#state{method = <<"PUT">>, path = [?UUID(_Iprange)]}) ->
-    {ok, [<<"cloud">>, <<"ipranges">>, <<"create">>]};
+permission_required(#state{method = <<"PUT">>, path = [?UUID(Iprange)]}) ->
+    {ok, [<<"ipranges">>, Iprange, <<"edit">>]};
 
 permission_required(#state{method = <<"PUT">>, path = [?UUID(Iprange), <<"metadata">> | _]}) ->
     {ok, [<<"ipranges">>, Iprange, <<"edit">>]};
@@ -154,7 +157,6 @@ create(Req, State = #state{path = [], version = Version}, Data) ->
 %% PUT
 %%--------------------------------------------------------------------
 
-%% TODO : This is a icky case it is called after post.
 write(Req, State = #state{path = [?UUID(Iprange)]}, _) ->
     case ls_iprange:claim(Iprange) of
         {ok, {Tag, IP, Netmask, Gateway, VLAN}} ->
@@ -164,7 +166,7 @@ write(Req, State = #state{path = [?UUID(Iprange)]}, _) ->
                     {netmask, ls_iprange:ip_to_bin(Netmask)},
                     {gateway, ls_iprange:ip_to_bin(Gateway)},
                     {vlan, VLAN}
-                    ],
+                   ],
             {Encoder, ContentType, Req2} =
                 case cowboy_req:header(<<"accept">>, Req) of
                     {<<"applicaiton/json", _/binary>>, Req1} ->
@@ -180,7 +182,7 @@ write(Req, State = #state{path = [?UUID(Iprange)]}, _) ->
                   200, [{<<"content-type">>, ContentType}], Body, Req2),
             {halt, Req3, State};
         _ ->
-            {true, Req, State}
+            {false, Req, State}
     end;
 
 write(Req, State = #state{path = [?UUID(Iprange), <<"metadata">> | Path]}, [{K, V}]) ->
