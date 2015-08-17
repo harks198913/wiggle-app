@@ -2,6 +2,7 @@
 
 -behaviour(application).
 
+-include("wiggle.hrl").
 -include("wiggle_version.hrl").
 
 %% Application callbacks
@@ -88,7 +89,7 @@ dispatchs() ->
      {<<"/api/:version/oauth/token">>,
       cowboy_oauth_token, []},
      {<<"/api/:version/oauth/auth">>,
-      cowboy_oauth_auth, [<<"/api/0.2.0/oauth/2fa">>]},
+      cowboy_oauth_auth, [<<"/api/", ?V2/binary, "/oauth/2fa">>]},
      {<<"/api/:version/oauth/2fa">>,
       cowboy_oauth_2fa, []},
      {<<"/api/:version/sessions/[...]">>,

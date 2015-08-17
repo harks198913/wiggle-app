@@ -61,6 +61,9 @@ permission_required(#state{method = <<"DELETE">>, path = [?UUID(Iprange)]}) ->
 permission_required(#state{method = <<"PUT">>, path = [?UUID(Iprange)]}) ->
     {ok, [<<"ipranges">>, Iprange, <<"edit">>]};
 
+permission_required(#state{method = <<"DELETE">>, path = [?UUID(Iprange), _IP]}) ->
+    {ok, [<<"ipranges">>, Iprange, <<"edit">>]};
+
 permission_required(#state{method = <<"PUT">>, path = [?UUID(Iprange), <<"metadata">> | _]}) ->
     {ok, [<<"ipranges">>, Iprange, <<"edit">>]};
 

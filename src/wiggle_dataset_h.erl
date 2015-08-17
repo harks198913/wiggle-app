@@ -44,10 +44,10 @@ allowed_methods(_Version, _Token, [?UUID(_Dataset), <<"dataset.gz">>]) ->
 allowed_methods(_Version, _Token, [?UUID(_Dataset), <<"dataset.bz2">>]) ->
     [<<"PUT">>, <<"GET">>];
 
-allowed_methods(<<"0.2.0">>, _Token, [?UUID(_Dataset), <<"networks">>, _]) ->
+allowed_methods(?V2, _Token, [?UUID(_Dataset), <<"networks">>, _]) ->
     [<<"PUT">>, <<"DELETE">>];
 
-allowed_methods(<<"0.1.0">>, _Token, [?UUID(_Dataset), <<"networks">>]) ->
+allowed_methods(?V1, _Token, [?UUID(_Dataset), <<"networks">>]) ->
     [<<"PUT">>];
 
 allowed_methods(_Version, _Token, [?UUID(_Dataset), <<"metadata">>|_]) ->
@@ -99,15 +99,15 @@ permission_required(#state{method = <<"PUT">>, path = [?UUID(Dataset), <<"datase
 permission_required(#state{method = <<"DELETE">>, path = [?UUID(Dataset)]}) ->
     {ok, [<<"datasets">>, Dataset, <<"delete">>]};
 
-permission_required(#state{method = <<"PUT">>, version = <<"0.1.0">>,
+permission_required(#state{method = <<"PUT">>, version = ?V1,
                            path = [?UUID(Dataset), <<"networks">>]}) ->
     {ok, [<<"datasets">>, Dataset, <<"edit">>]};
 
-permission_required(#state{method = <<"PUT">>, version = <<"0.2.0">>,
+permission_required(#state{method = <<"PUT">>, version = ?V2,
                            path = [?UUID(Dataset), <<"networks">>, _]}) ->
     {ok, [<<"datasets">>, Dataset, <<"edit">>]};
 
-permission_required(#state{method = <<"DELETE">>, version = <<"0.1.0">>,
+permission_required(#state{method = <<"DELETE">>, version = ?V1,
                            path = [?UUID(Dataset), <<"networks">>, _]}) ->
     {ok, [<<"datasets">>, Dataset, <<"edit">>]};
 
@@ -237,7 +237,7 @@ write(Req, State = #state{path = [?UUID(Dataset), <<"metadata">> | Path]}, [{K, 
     {true, Req, State};
 
 write(Req, State = #state{path = [?UUID(Dataset), <<"networks">>, NIC],
-                          obj = Obj, version = <<"0.2.0">>},
+                          obj = Obj, version = ?V2},
       [{<<"description">>, Desc}]) ->
     Start = erlang:system_time(micro_seconds),
     [ls_dataset:remove_network(Dataset, E) || E = {_NIC, _} <- ft_dataset:networks(Obj),
@@ -250,7 +250,7 @@ write(Req, State = #state{path = [?UUID(Dataset), <<"networks">>, NIC],
 
 
 write(Req, State = #state{path = [?UUID(Dataset), <<"networks">>],
-                          version = <<"0.1.0">>}, Data) ->
+                          version = ?V1}, Data) ->
     Start = erlang:system_time(micro_seconds),
     Nets =
         ordsets:from_list(

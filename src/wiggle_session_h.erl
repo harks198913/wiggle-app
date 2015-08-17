@@ -101,7 +101,7 @@ create(Req, State = #state{path = [], version = ?V1}, Decoded) ->
             case R2 of
                 {ok, {token, Session}} ->
                     Req2 = cowboy_req:set_resp_header(<<"x-snarl-token">>, Session, Req),
-                    {{true, <<"/api/0.1.0/sessions/", Session/binary>>},
+                    {{true, <<"/api/", ?V1/binary, "/sessions/", Session/binary>>},
                      Req2, State#state{body = Decoded}};
                 key_required ->
                     {ok, Req1} = cowboy_req:reply(449, [], <<"Retry with valid parameters: user, password, otp.">>, Req),
