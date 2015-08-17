@@ -169,12 +169,12 @@ write(Req, State = #state{path = [?UUID(Iprange)]}, _) ->
                    ],
             {Encoder, ContentType, Req2} =
                 case cowboy_req:header(<<"accept">>, Req) of
-                    {<<"applicaiton/json", _/binary>>, Req1} ->
+                    {<<"application/json", _/binary>>, Req1} ->
                         {fun jsx:encode/1,
-                         <<"applicaiton/json">>, Req1};
-                    {<<"applicaiton/x-msgpack", _/binary>>, Req1} ->
+                         <<"application/json">>, Req1};
+                    {<<"application/x-msgpack", _/binary>>, Req1} ->
                         {fun (Body) -> msgpack:pack(Body, [jsx]) end,
-                         <<"applicaiton/x-msgpack">>, Req1}
+                         <<"application/x-msgpack">>, Req1}
                 end,
             Body = Encoder(JSON),
             {ok, Req3} =
