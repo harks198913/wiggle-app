@@ -22,7 +22,6 @@
          create/3,
          write/3,
          delete/2,
-         raw_body/1,
          content_types_accepted/1,
          content_types_provided/1]).
 
@@ -120,22 +119,16 @@ permission_required(#state{method = <<"DELETE">>, path = [?UUID(Dataset), <<"met
 permission_required(_State) ->
     undefined.
 
-
-raw_body(#state{path=[_, <<"dataset.gz">>], method = <<"PUT">>}) ->
-    true;
-raw_body(_) ->
-    false.
-
 content_types_accepted(#state{path=[_, <<"dataset.gz">>], method = <<"PUT">>}) ->
     [
-     {{<<"application">>, <<"x-gzip">>, '*'}, write}
+     {{<<"application">>, <<"x-gzip">>, '*'}, write_raw}
     ];
 content_types_accepted(_) ->
     wiggle_h:accepted().
 
 content_types_provided(#state{path=[_, <<"dataset.gz">>], method = <<"GET">>}) ->
     [
-     {{<<"application">>, <<"x-gzip">>, []}, read}
+     {{<<"application">>, <<"x-gzip">>, []}, read_raw}
     ];
 content_types_provided(_) ->
     wiggle_h:provided().

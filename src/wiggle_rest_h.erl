@@ -17,6 +17,9 @@
          generate_etag/2,
          is_authorized/2]).
 
+-export([read_raw/2,
+         write_raw/2]).
+
 -export([read_json/2,
          write_json/2]).
 
@@ -24,6 +27,8 @@
          write_msgpack/2]).
 
 -ignore_xref([
+              read_raw/2,
+              write_raw/2,
               read_json/2,
               write_json/2,
               read_msgpack/2,
@@ -202,11 +207,24 @@ forbidden(Req, State = #state{module = M}) ->
 %%--------------------------------------------------------------------
 
 
+read_raw(Req, State) ->
+    read(Req, raw, State).
+
 read_json(Req, State) ->
     read(Req, json, State).
 
 read_msgpack(Req, State) ->
     read(Req, msgpack, State).
+
+read(Req, raw, State = #state{module = M}) ->
+    case M:read(Req, State) of
+        {{chunked, _StreamFun}, _Req, _State} = Reply ->
+            Reply;
+        {Data, Req1, State1} ->
+            Start = erlang:system_time(micro_seconds),
+            ?MEx(?P(State), <<"encode">>, Start),
+            {Data, Req1, State1#state{obj = Data}}
+    end;
 
 read(Req, MediaType, State = #state{module = M}) ->
     case M:read(Req, State) of
@@ -223,27 +241,21 @@ read(Req, MediaType, State = #state{module = M}) ->
 %% write
 %%--------------------------------------------------------------------
 
+write_raw(Req, State) ->
+    write(Req, raw, State).
+
 write_json(Req, State) ->
     write(Req, json, State).
 
 write_msgpack(Req, State) ->
     write(Req, msgpack, State).
 
-write(Req, ContentType, State = #state{module = M, body = undefined}) ->
-    RawFun = case erlang:function_exported(M, raw_body, 1) of
-                 true ->
-                     fun M:raw_body/1;
-                 false ->
-                     fun(_) -> false end
-             end,
-    case RawFun(State) of
-        true ->
-            lager:info("This is a raw request"),
-            write2(Req, State);
-        false ->
-            {ok, Data, Req1} = wiggle_h:decode(Req, ContentType),
-            write1(Req1, State#state{body = Data})
-    end;
+write(Req, raw, State = #state{ body = undefined}) ->
+    write2(Req, State);
+
+write(Req, ContentType, State = #state{body = undefined}) ->
+    {ok, Data, Req1} = wiggle_h:decode(Req, ContentType),
+    write1(Req1, State#state{body = Data});
 
 write(Req, _ContentType, State) ->
     write1(Req, State).
