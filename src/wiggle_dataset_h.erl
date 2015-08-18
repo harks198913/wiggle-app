@@ -451,7 +451,7 @@ ensure_integer(I) when is_integer(I) ->
 ensure_integer(L) when is_list(L) ->
     list_to_integer(L);
 ensure_integer(B) when is_binary(B) ->
-    list_to_integer(binary_to_list(B)).
+    binary_to_integer(B).
 
 do_strea(SendChunk, D) ->
     case fifo_s3_download:get(D) of
