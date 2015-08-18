@@ -1,6 +1,6 @@
 REBAR = $(shell pwd)/rebar3
 
-.PHONY: version
+.PHONY: version all tree
 
 all: .git/hooks/pre-commit compile
 
