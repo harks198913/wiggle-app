@@ -132,14 +132,22 @@ create(Req, State = #state{token = Token, path = [], version = Version}, Decoded
     {ok, Client} = jsxd:get(<<"client">>, Decoded),
     {ok, Pass} = jsxd:get(<<"secret">>, Decoded),
     Start = erlang:system_time(micro_seconds),
-    {ok, UUID} = ls_client:add(CUUID, Client),
-    ?MSnarl(?P(State), Start),
-    Start1 = erlang:system_time(micro_seconds),
-    ok = ls_client:secret(UUID, Pass),
-    e2qc:teardown(?LIST_CACHE),
-    e2qc:teardown(?FULL_CACHE),
-    ?MSnarl(?P(State), Start1),
-    {{true, <<"/api/", Version/binary, "/clients/", UUID/binary>>}, Req, State#state{body = Decoded}}.
+    case ls_client:add(CUUID, Client) of
+        {ok, UUID} ->
+            ?MSnarl(?P(State), Start),
+            Start1 = erlang:system_time(micro_seconds),
+            ok = ls_client:secret(UUID, Pass),
+            e2qc:teardown(?LIST_CACHE),
+            e2qc:teardown(?FULL_CACHE),
+            ?MSnarl(?P(State), Start1),
+            {{true, <<"/api/", Version/binary, "/clients/", UUID/binary>>},
+             Req, State#state{body = Decoded}};
+        duplicate ->
+            ?MSniffle(?P(State), Start),
+            {ok, Req1} = cowboy_req:reply(409, Req),
+            {halt, Req1, State}
+    end.
+
 
 write(Req, State = #state{path =  [?UUID(Client)]}, [{<<"secret">>, Secret}]) ->
     Start = erlang:system_time(micro_seconds),

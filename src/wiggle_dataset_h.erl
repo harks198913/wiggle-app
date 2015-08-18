@@ -22,7 +22,6 @@
          create/3,
          write/3,
          delete/2,
-         raw_body/1,
          content_types_accepted/1,
          content_types_provided/1]).
 
@@ -44,10 +43,10 @@ allowed_methods(_Version, _Token, [?UUID(_Dataset), <<"dataset.gz">>]) ->
 allowed_methods(_Version, _Token, [?UUID(_Dataset), <<"dataset.bz2">>]) ->
     [<<"PUT">>, <<"GET">>];
 
-allowed_methods(<<"0.2.0">>, _Token, [?UUID(_Dataset), <<"networks">>, _]) ->
+allowed_methods(?V2, _Token, [?UUID(_Dataset), <<"networks">>, _]) ->
     [<<"PUT">>, <<"DELETE">>];
 
-allowed_methods(<<"0.1.0">>, _Token, [?UUID(_Dataset), <<"networks">>]) ->
+allowed_methods(?V1, _Token, [?UUID(_Dataset), <<"networks">>]) ->
     [<<"PUT">>];
 
 allowed_methods(_Version, _Token, [?UUID(_Dataset), <<"metadata">>|_]) ->
@@ -99,15 +98,15 @@ permission_required(#state{method = <<"PUT">>, path = [?UUID(Dataset), <<"datase
 permission_required(#state{method = <<"DELETE">>, path = [?UUID(Dataset)]}) ->
     {ok, [<<"datasets">>, Dataset, <<"delete">>]};
 
-permission_required(#state{method = <<"PUT">>, version = <<"0.1.0">>,
+permission_required(#state{method = <<"PUT">>, version = ?V1,
                            path = [?UUID(Dataset), <<"networks">>]}) ->
     {ok, [<<"datasets">>, Dataset, <<"edit">>]};
 
-permission_required(#state{method = <<"PUT">>, version = <<"0.2.0">>,
+permission_required(#state{method = <<"PUT">>, version = ?V2,
                            path = [?UUID(Dataset), <<"networks">>, _]}) ->
     {ok, [<<"datasets">>, Dataset, <<"edit">>]};
 
-permission_required(#state{method = <<"DELETE">>, version = <<"0.1.0">>,
+permission_required(#state{method = <<"DELETE">>, version = ?V1,
                            path = [?UUID(Dataset), <<"networks">>, _]}) ->
     {ok, [<<"datasets">>, Dataset, <<"edit">>]};
 
@@ -120,22 +119,16 @@ permission_required(#state{method = <<"DELETE">>, path = [?UUID(Dataset), <<"met
 permission_required(_State) ->
     undefined.
 
-
-raw_body(#state{path=[_, <<"dataset.gz">>], method = <<"PUT">>}) ->
-    true;
-raw_body(_) ->
-    false.
-
 content_types_accepted(#state{path=[_, <<"dataset.gz">>], method = <<"PUT">>}) ->
     [
-     {{<<"application">>, <<"x-gzip">>, '*'}, write}
+     {{<<"application">>, <<"x-gzip">>, '*'}, write_raw}
     ];
 content_types_accepted(_) ->
     wiggle_h:accepted().
 
 content_types_provided(#state{path=[_, <<"dataset.gz">>], method = <<"GET">>}) ->
     [
-     {{<<"application">>, <<"x-gzip">>, []}, read}
+     {{<<"application">>, <<"x-gzip">>, []}, read_raw}
     ];
 content_types_provided(_) ->
     wiggle_h:provided().
@@ -237,7 +230,7 @@ write(Req, State = #state{path = [?UUID(Dataset), <<"metadata">> | Path]}, [{K, 
     {true, Req, State};
 
 write(Req, State = #state{path = [?UUID(Dataset), <<"networks">>, NIC],
-                          obj = Obj, version = <<"0.2.0">>},
+                          obj = Obj, version = ?V2},
       [{<<"description">>, Desc}]) ->
     Start = erlang:system_time(micro_seconds),
     [ls_dataset:remove_network(Dataset, E) || E = {_NIC, _} <- ft_dataset:networks(Obj),
@@ -250,7 +243,7 @@ write(Req, State = #state{path = [?UUID(Dataset), <<"networks">>, NIC],
 
 
 write(Req, State = #state{path = [?UUID(Dataset), <<"networks">>],
-                          version = <<"0.1.0">>}, Data) ->
+                          version = ?V1}, Data) ->
     Start = erlang:system_time(micro_seconds),
     Nets =
         ordsets:from_list(
@@ -458,7 +451,7 @@ ensure_integer(I) when is_integer(I) ->
 ensure_integer(L) when is_list(L) ->
     list_to_integer(L);
 ensure_integer(B) when is_binary(B) ->
-    list_to_integer(binary_to_list(B)).
+    binary_to_integer(B).
 
 do_strea(SendChunk, D) ->
     case fifo_s3_download:get(D) of
