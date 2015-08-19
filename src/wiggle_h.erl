@@ -221,7 +221,7 @@ accepted() ->
     ].
 
 content_type(Req) ->
-    case cowboy_req:header(<<"accept-encoding">>, Req) of
+    case cowboy_req:header(<<"content-type">>, Req) of
         {<<"application/x-msgpack", _/binary>>, Req1} ->
             {msgpack, Req1};
         {<<"application/json", _/binary>>, Req1} ->

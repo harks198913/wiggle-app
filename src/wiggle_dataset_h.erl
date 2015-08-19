@@ -315,7 +315,7 @@ do_import([], _UUID, _O) ->
     ok;
 
 do_import([{K, F} | R], UUID, O) ->
-    case jsxd:get([K], O) of
+    case jsxd:get(K, O) of
         {ok, V}  ->
             F(UUID, V);
         _ ->

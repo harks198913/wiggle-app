@@ -505,11 +505,11 @@ create(Req, State = #state{path = [], version = Version, token = Token}, Decoded
 create(Req, State = #state{path = [?UUID(Vm), <<"snapshots">>], version = Version}, Decoded) ->
     Comment = jsxd:get(<<"comment">>, <<"">>, Decoded),
     Start = erlang:system_time(micro_seconds),
-    {ok, UUID} = ls_vm:snapshot(Vm, Comment),
+    {ok, _UUID} = ls_vm:snapshot(Vm, Comment),
     e2qc:evict(?CACHE, Vm),
     e2qc:teardown(?FULL_CACHE),
     ?MSniffle(?P(State), Start),
-    {{true, <<"/api/", Version/binary, "/vms/", Vm/binary, "/snapshots/", UUID/binary>>}, Req, State#state{body = Decoded}};
+    {{true, <<"/api/", Version/binary, "/vms/", Vm/binary>>}, Req, State#state{body = Decoded}};
 
 create(Req, State = #state{path = [?UUID(Vm), <<"fw_rules">>],
                            version = Version}, RuleJSON) ->
@@ -525,29 +525,29 @@ create(Req, State = #state{path = [?UUID(Vm), <<"backups">>], version = Version}
     Comment = jsxd:get(<<"comment">>, <<"">>, Decoded),
     Opts = [xml],
     Start = erlang:system_time(micro_seconds),
-    {ok, UUID} = case jsxd:get(<<"parent">>, Decoded) of
-                     {ok, Parent} ->
-                         Opts1 = case jsxd:get(<<"delete">>, false, Decoded) of
-                                     true ->
-                                         [{delete, parent} | Opts];
-                                     false ->
-                                         Opts
-                                 end,
-                         e2qc:evict(?CACHE, Vm),
-                         e2qc:teardown(?FULL_CACHE),
-                         ls_vm:incremental_backup(Vm, Parent, Comment,
-                                                  Opts1);
-                     _ ->
-                         Opts1 = case jsxd:get(<<"delete">>, false, Decoded) of
-                                     true ->
-                                         [delete | Opts];
-                                     false ->
-                                         Opts
-                                 end,
-                         ls_vm:full_backup(Vm, Comment, Opts1)
-                 end,
+    case jsxd:get(<<"parent">>, Decoded) of
+        {ok, Parent} ->
+            Opts1 = case jsxd:get(<<"delete">>, false, Decoded) of
+                        true ->
+                            [{delete, parent} | Opts];
+                        false ->
+                            Opts
+                    end,
+            e2qc:evict(?CACHE, Vm),
+            e2qc:teardown(?FULL_CACHE),
+            {ok, _UUID} = ls_vm:incremental_backup(Vm, Parent, Comment,
+                                                   Opts1);
+        _ ->
+            Opts1 = case jsxd:get(<<"delete">>, false, Decoded) of
+                        true ->
+                            [delete | Opts];
+                        false ->
+                            Opts
+                    end,
+            {ok, _UUID} = ls_vm:full_backup(Vm, Comment, Opts1)
+    end,
     ?MSniffle(?P(State), Start),
-    {{true, <<"/api/", Version/binary, "/vms/", Vm/binary, "/backups/", UUID/binary>>}, Req, State#state{body = Decoded}};
+    {{true, <<"/api/", Version/binary, "/vms/", Vm/binary>>}, Req, State#state{body = Decoded}};
 
 
 create(Req, State = #state{path = [?UUID(Vm), <<"nics">>], version = Version}, Decoded) ->
