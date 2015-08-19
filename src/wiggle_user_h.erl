@@ -23,23 +23,29 @@
 
 -behaviour(wiggle_rest_h).
 
-allowed_methods(_Version, _Token, []) ->
+allowed_methods(_V, _Token, []) ->
     [<<"GET">>, <<"POST">>];
 
-allowed_methods(_Version, _Token, [?UUID(_User)]) ->
+allowed_methods(_V, _Token, [?UUID(_User)]) ->
     [<<"GET">>, <<"PUT">>, <<"DELETE">>];
 
-allowed_methods(_Version, _Token, [?UUID(_User), <<"metadata">> | _]) ->
+allowed_methods(_V, _Token, [?UUID(_User), <<"metadata">> | _]) ->
     [<<"PUT">>, <<"DELETE">>];
 
 allowed_methods(?V1, _Token, [?UUID(_User), <<"keys">>]) ->
     [<<"GET">>, <<"PUT">>];
+
+allowed_methods(_V, _Token, [?UUID(_User), <<"keys">>]) ->
+    [<<"PUT">>];
 
 allowed_methods(_Version, _Token, [?UUID(_User), <<"keys">>, _]) ->
     [<<"DELETE">>];
 
 allowed_methods(?V1, _Token, [?UUID(_User), <<"yubikeys">>]) ->
     [<<"GET">>, <<"PUT">>];
+
+allowed_methods(_V, _Token, [?UUID(_User), <<"yubikeys">>]) ->
+    [<<"PUT">>];
 
 allowed_methods(_Version, _Token, [?UUID(_User), <<"yubikeys">>, _]) ->
     [<<"DELETE">>];
@@ -53,7 +59,7 @@ allowed_methods(_, _Token, [?UUID(_User), <<"permissions">> | _Permission]) ->
 allowed_methods(?V1, _Token, [?UUID(_User), <<"roles">>]) ->
     [<<"GET">>];
 
-allowed_methods(?V1, _Token, [?UUID(_User), <<"roles">>, _Role]) ->
+allowed_methods(_, _Token, [?UUID(_User), <<"roles">>, _Role]) ->
     [<<"PUT">>, <<"DELETE">>];
 
 allowed_methods(?V1, _Token, [?UUID(_User), <<"orgs">>]) ->
