@@ -34,8 +34,11 @@
 allowed_methods(_Version, _Token, []) ->
     [<<"GET">>, <<"POST">>];
 
+allowed_methods(?V1, _Token, [?UUID(_Dataset)]) ->
+    [<<"GET">>, <<"DELETE">>, <<"POST">>];
+
 allowed_methods(_Version, _Token, [?UUID(_Dataset)]) ->
-    [<<"GET">>, <<"DELETE">>, <<"PUT">>, <<"POST">>];
+    [<<"GET">>, <<"DELETE">>, <<"PUT">>];
 
 allowed_methods(_Version, _Token, [?UUID(_Dataset), <<"dataset.gz">>]) ->
     [<<"PUT">>, <<"GET">>];
@@ -210,6 +213,20 @@ create(Req, State = #state{path = [], version = Version}, Decoded) ->
 %% PUT
 %%--------------------------------------------------------------------
 
+write(Req, State = #state{path = [UUID], version = Version}, Decoded) ->
+    case ls_dataset:create(UUID) of
+        duplicate ->
+            {false, Req, State};
+        _ ->
+            e2qc:teardown(?LIST_CACHE),
+            e2qc:teardown(?FULL_CACHE),
+            import_manifest(UUID, Decoded),
+            ls_dataset:imported(UUID, 0),
+            ls_dataset:status(UUID, <<"pending">>),
+            {{true, <<"/api/", Version/binary, "/datasets/", UUID/binary>>},
+             Req, State#state{body = Decoded}}
+    end;
+
 write(Req, State = #state{path = [UUID, <<"dataset.gz">>]}, _) ->
     case ls_dataset:get(UUID) of
         {ok, R} ->
@@ -258,18 +275,6 @@ write(Req, State = #state{path = [?UUID(Dataset), <<"networks">>],
     e2qc:evict(?CACHE, Dataset),
     e2qc:teardown(?FULL_CACHE),
     ?MSniffle(?P(State), Start),
-    {true, Req, State};
-
-write(Req, State = #state{path = [?UUID(_Dataset)]}, [{_K, _V}]) ->
-    %%Start = erlang:system_time(micro_seconds),
-    %% TODO: Cut this down in smaller pices.
-    %%ok = libsniffle:dataset_set(Dataset, [K], jsxd:from_list(V)),
-    %%e2qc:evict(?CACHE, Dataset),
-    %%e2qc:teardown(?FULL_CACHE),
-    %%?MSniffle(?P(State), Start),
-    {true, Req, State};
-
-write(Req, State = #state{path = []}, _Body) ->
     {true, Req, State};
 
 write(Req, State, _Body) ->
