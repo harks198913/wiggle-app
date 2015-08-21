@@ -213,7 +213,7 @@ create(Req, State = #state{path = [], version = Version}, Decoded) ->
 %% PUT
 %%--------------------------------------------------------------------
 
-write(Req, State = #state{path = [UUID], version = Version}, Decoded) ->
+write(Req, State = #state{path = [UUID]}, Decoded) ->
     case ls_dataset:create(UUID) of
         duplicate ->
             {false, Req, State};
@@ -223,8 +223,7 @@ write(Req, State = #state{path = [UUID], version = Version}, Decoded) ->
             import_manifest(UUID, Decoded),
             ls_dataset:imported(UUID, 0),
             ls_dataset:status(UUID, <<"pending">>),
-            {{true, <<"/api/", Version/binary, "/datasets/", UUID/binary>>},
-             Req, State#state{body = Decoded}}
+            {true, Req, State#state{body = Decoded}}
     end;
 
 write(Req, State = #state{path = [UUID, <<"dataset.gz">>]}, _) ->
