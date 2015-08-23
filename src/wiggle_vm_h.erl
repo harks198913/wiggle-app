@@ -560,6 +560,10 @@ create(Req, State = #state{path = [?UUID(Vm), <<"nics">>], version = Version}, D
             e2qc:teardown(?FULL_CACHE),
             {{true, <<"/api/", Version/binary, "/vms/", Vm/binary>>},
              Req, State#state{body = Decoded}};
+        {error, not_stopped} ->
+            {ok, Req1} = cowboy_req:reply(412, [], <<"VM Running">>, Req),
+            lager:error("Could not add nic, vm running."),
+            {halt, Req1, State};
         E ->
             ?MSniffle(?P(State), Start),
             lager:error("Error adding nic to VM(~p) on network(~p) / ~p", [?UUID(Vm), Network, E]),
@@ -669,8 +673,8 @@ write(Req, State = #state{path = [?UUID(Vm), <<"owner">>]}, [{<<"org">>, Org}]) 
             ?MSniffle(?P(State), Start),
             lager:error("Error trying to assign org ~p since it does not "
                         "seem to exist", [Org]),
-            {ok, Req1} = cowboy_req:reply(500, Req),
-            lager:error("Could not add nic: ~p", [E]),
+            {ok, Req1} = cowboy_req:reply(404, Req),
+            lager:error("Could not change owner: ~p", [E]),
             {halt, Req1, State}
     end;
 
