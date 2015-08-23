@@ -43,7 +43,7 @@ allowed_methods(_Version, _Token, [?UUID(_Client), <<"uris">>]) ->
     [<<"POST">>];
 
 allowed_methods(_Version, _Token, [?UUID(_Client), <<"uris">>, _]) ->
-    [ <<"DELETE">>];
+    [<<"DELETE">>];
 
 allowed_methods(_Version, _Token, [?UUID(_Client), <<"metadata">> | _]) ->
     [<<"PUT">>, <<"DELETE">>].
@@ -89,7 +89,7 @@ permission_required(#state{method = <<"POST">>,
     {ok, [<<"clients">>, Client, <<"edit">>]};
 
 permission_required(#state{method = <<"DELETE">>,
-                           path = [?UUID(Client), <<"urls">>, _]}) ->
+                           path = [?UUID(Client), <<"uris">>, _]}) ->
     {ok, [<<"clients">>, Client, <<"edit">>]};
 
 permission_required(#state{path = [?UUID(Client), <<"metadata">> | _]}) ->
@@ -126,28 +126,35 @@ read(Req, State = #state{path = [_Client], obj = ClientObj}) ->
 %% PUT
 %%--------------------------------------------------------------------
 
-create(Req, State = #state{token = Token, path = [], version = Version}, Decoded) ->
+create(Req, State = #state{token = Token, path = [], version = Version}, 
+       [{<<"client">>, Client},
+        {<<"secret">>, Secret}]) ->
     {ok, Creator} = ls_user:get(Token),
     CUUID = ft_user:uuid(Creator),
-    {ok, Client} = jsxd:get(<<"client">>, Decoded),
-    {ok, Pass} = jsxd:get(<<"secret">>, Decoded),
     Start = erlang:system_time(micro_seconds),
     case ls_client:add(CUUID, Client) of
         {ok, UUID} ->
             ?MSnarl(?P(State), Start),
             Start1 = erlang:system_time(micro_seconds),
-            ok = ls_client:secret(UUID, Pass),
+            ok = ls_client:secret(UUID, Secret),
             e2qc:teardown(?LIST_CACHE),
             e2qc:teardown(?FULL_CACHE),
             ?MSnarl(?P(State), Start1),
             {{true, <<"/api/", Version/binary, "/clients/", UUID/binary>>},
-             Req, State#state{body = Decoded}};
+             Req, State};
         duplicate ->
             ?MSniffle(?P(State), Start),
             {ok, Req1} = cowboy_req:reply(409, Req),
             {halt, Req1, State}
-    end.
+    end;
 
+create(Req, State = #state{path = [?UUID(Client), <<"uris">>],
+                           version = Version}, [{<<"uri">>, URI}]) ->
+    Start = erlang:system_time(micro_seconds),
+    ok = ls_client:uri_add(Client, URI),
+    ?MSniffle(?P(State), Start),
+    {{true, <<"/api/", Version/binary, "/clients/", Client/binary>>},
+     Req, State}.
 
 write(Req, State = #state{path =  [?UUID(Client)]}, [{<<"secret">>, Secret}]) ->
     Start = erlang:system_time(micro_seconds),
@@ -175,6 +182,22 @@ delete(Req, State = #state{path = [?UUID(Client), <<"metadata">> | Path]}) ->
     ?MSnarl(?P(State), Start),
     {true, Req, State};
 
+delete(Req, State = #state{path = [?UUID(Client), <<"uris">>, URIHash], obj = Obj}) ->
+    URIs = ft_client:uris(Obj),
+    ID = binary_to_integer(URIHash),
+    Found = lists:filter(fun(ThisURI) ->
+                                 ID == erlang:phash2(ThisURI)
+                         end, URIs),
+    case Found of
+        [URI] ->
+            ok = ls_client:uri_remove(Client, URI),
+            e2qc:evict(?CACHE, Client),
+            e2qc:teardown(?LIST_CACHE),
+            e2qc:teardown(?FULL_CACHE),
+            {true, Req, State};
+        _ ->
+            {true, Req, State}
+    end;
 
 delete(Req, State = #state{path = [?UUID(Client)]}) ->
     Start = erlang:system_time(micro_seconds),
@@ -192,7 +215,12 @@ delete(Req, State = #state{path = [?UUID(Client)]}) ->
 to_json(U) ->
     U1 = ft_client:to_json(U),
     U2 = jsxd:delete([<<"secret">>], U1),
-    jsxd:update([<<"metadata">>],
-                fun(M) ->
-                        jsxd:get([<<"public">>], [{}], M)
-                end, [{}], U2).
+    U3 = jsxd:update([<<"metadata">>],
+                     fun(M) ->
+                             jsxd:get([<<"public">>], [{}], M)
+                     end, [{}], U2),
+    jsxd:update([<<"redirect_uris">>],
+                fun(URIs) ->
+                        [{integer_to_binary(erlang:phash2(URI)), URI}
+                         || URI <- URIs]
+                end, [{}], U3).
