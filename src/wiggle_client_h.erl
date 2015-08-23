@@ -148,7 +148,7 @@ create(Req, State = #state{token = Token, path = [], version = Version},
             {halt, Req1, State}
     end;
 
-create(Req, State = #state{path = [?UUID(Client), <<"uirs">>],
+create(Req, State = #state{path = [?UUID(Client), <<"uris">>],
                            version = Version}, [{<<"uri">>, URI}]) ->
     Start = erlang:system_time(micro_seconds),
     ok = ls_client:uri_add(Client, URI),
