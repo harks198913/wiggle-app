@@ -89,7 +89,7 @@ permission_required(#state{method = <<"POST">>,
     {ok, [<<"clients">>, Client, <<"edit">>]};
 
 permission_required(#state{method = <<"DELETE">>,
-                           path = [?UUID(Client), <<"urls">>, _]}) ->
+                           path = [?UUID(Client), <<"uris">>, _]}) ->
     {ok, [<<"clients">>, Client, <<"edit">>]};
 
 permission_required(#state{path = [?UUID(Client), <<"metadata">> | _]}) ->
