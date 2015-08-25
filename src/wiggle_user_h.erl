@@ -324,15 +324,24 @@ write(Req, State = #state{path = [?UUID(User), <<"keys">>]}, [{KeyID, Key}]) ->
     case re:split(Key, " ") of
         [_,ID,_] ->
             try
+                %% We do this to ensure it can be decoded!
                 base64:decode(ID),
                 Start = erlang:system_time(micro_seconds),
-                ok = ls_user:key_add(User, KeyID, Key),
-                e2qc:evict(?CACHE, User),
-                e2qc:teardown(?FULL_CACHE),
-                ?MSnarl(?P(State), Start),
-                {true, Req, State}
+                case ls_user:key_add(User, KeyID, Key) of
+                    ok ->
+                        e2qc:evict(?CACHE, User),
+                        e2qc:teardown(?FULL_CACHE),
+                        ?MSnarl(?P(State), Start),
+                        {true, Req, State};
+                    duplicate ->
+                        ?MSnarl(?P(State), Start),
+                        lager:error("[ssh] Doublicated key: ~s", [ID]),
+                        {ok, Req1} = cowboy_req:reply(404, Req),
+                        {halt, Req1, State}
+                end
             catch
                 _:_ ->
+                    lager:error("[ssh] Couldn't base64 decode id: ~s", [ID]),
                     {false, Req, State}
             end;
         _ ->
