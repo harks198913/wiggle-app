@@ -459,7 +459,7 @@ read(Req, State = #state{path = [?UUID(Vm), <<"metrics">>]}) ->
     {QS, Req1} = cowboy_req:qs_vals(Req),
     {ok, Q} = perf(Vm, lists:sort(QS)),
     lager:debug("[metrics] Running query ~s", [Q]),
-    {T, {ok, Res}} = timer:tc(dqe, run, [Q]),
+    {T, {ok, _T0, Res}} = timer:tc(dqe, run, [Q]),
     lager:debug("[metrics] The query took ~pus", [T]),
     JSON = [[{<<"n">>, Name},
              {<<"r">>, Resolution},
