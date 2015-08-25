@@ -336,7 +336,7 @@ write(Req, State = #state{path = [?UUID(User), <<"keys">>]}, [{KeyID, Key}]) ->
                     duplicate ->
                         ?MSnarl(?P(State), Start),
                         lager:error("[ssh] Doublicated key: ~s", [ID]),
-                        {ok, Req1} = cowboy_req:reply(404, Req),
+                        {ok, Req1} = cowboy_req:reply(409, Req),
                         {halt, Req1, State}
                 end
             catch
