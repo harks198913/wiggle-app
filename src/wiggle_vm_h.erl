@@ -458,9 +458,7 @@ read(Req, State = #state{path = [?UUID(_Vm)], obj = Obj}) ->
 read(Req, State = #state{path = [?UUID(Vm), <<"metrics">>]}) ->
     {QS, Req1} = cowboy_req:qs_vals(Req),
     {ok, Q} = perf(Vm, lists:sort(QS)),
-    lager:debug("[metrics] Running query ~s", [Q]),
-    {T, {ok, Res}} = timer:tc(dqe, run, [Q]),
-    lager:debug("[metrics] The query took ~pus", [T]),
+    {ok, _T0, Res} = dqe:run(Q),
     JSON = [[{<<"n">>, Name},
              {<<"r">>, Resolution},
              {<<"v">>, mmath_bin:to_list(Data)}]
@@ -985,16 +983,15 @@ perf_cpu(Zone) ->
      {[$', Zone | "'.'cpu'.'effective' BUCKET zone"], "cpu-effective"},
      {[$', Zone | "'.'cpu'.'nwait' BUCKET zone"], "cpu-nwait"}].
 
-
 perf_mem(Zone) ->
-    [{[$', Zone | "'.'mem'.'usage' BUCKET zone"], "memory-usage"},
-     {[$', Zone | "'.'mem'.'value' BUCKET zone"], "memory-value"}].
-
+    [{["divide('", Zone | "'.'mem'.'usage' BUCKET zone, 1048576)"],
+      "memory-usage"},
+     {["divide('", Zone | "'.'mem'.'value' BUCKET zone, 1048576)"],
+      "memory-value"}].
 
 perf_swap(Zone) ->
-    [{[$', Zone | "'.'swap'.'usage' BUCKET zone"], "swapory-usage"},
-     {[$', Zone | "'.'swap'.'value' BUCKET zone"], "swapory-value"}].
-
+    [{["divide('", Zone | "'.'swap'.'usage' BUCKET zone, 1048576)"], "swap-usage"},
+     {["divide('", Zone | "'.'swap'.'value' BUCKET zone, 1048576)"], "swap-value"}].
 
 perf_net(Zone, Nic) ->
     [{["derivate('", Zone, "'.'net'.'", Nic, "'.'opackets64' BUCKET zone)"],
@@ -1015,7 +1012,6 @@ perf_zfs(Zone) ->
 apply_aggr(Aggr, Res, Elements) ->
     [{[Aggr, $(, Qry, ", ", Res, $)], Alias} ||
         {Qry, Alias} <- Elements].
-
 
 apply_query(Elements, Range) ->
     Elements1 = [[Qry, " AS '", Alias, "'"] || {Qry, Alias} <- Elements],
