@@ -1,6 +1,3 @@
-%% Feel free to use, reuse and abuse the code in this file.
-
-%% @doc Hello world handler.
 -module(wiggle_user_h).
 -include("wiggle.hrl").
 

@@ -457,13 +457,7 @@ read(Req, State = #state{path = [?UUID(_Vm)], obj = Obj}) ->
 
 read(Req, State = #state{path = [?UUID(Vm), <<"metrics">>]}) ->
     {QS, Req1} = cowboy_req:qs_vals(Req),
-    {ok, Q} = perf(Vm, lists:sort(QS)),
-    {ok, _T0, Res} = dqe:run(Q),
-    JSON = [[{<<"n">>, Name},
-             {<<"r">>, Resolution},
-             {<<"v">>, mmath_bin:to_list(Data)}]
-            || {Name, Data, Resolution} <- Res],
-
+    JSON = perf(Vm, QS),
     {JSON, Req1, State}.
 
 
@@ -920,99 +914,43 @@ find_rule(ID, VM) ->
 %% Internal
 %%--------------------------------------------------------------------
 
-valid_time(_Time) ->
-    true. %% TODO!
-
-valid_pit(_PIT) ->
-    true. %% TODO
-
 perf(UUID, QS) ->
-    Zone = perf_zone_id(UUID),
+    Zone = wiggle_metrics:short_id(UUID),
     Elems = perf_cpu(Zone) ++ perf_mem(Zone) ++ perf_swap(Zone)
         ++ perf_net(Zone, <<"net0">>) ++ perf_zfs(Zone),
-    case lists:keytake(<<"aggr">>, 1, QS) of
-        false ->
-            perf1(Elems, QS);
-        {value, {<<"aggr">>, Res}, QS1} ->
-            case valid_time(Res) of
-                true ->
-                    Elems1 = apply_aggr("avg", Res, Elems),
-                    perf1(Elems1, QS1);
-                false ->
-                    {error, bad_resolution}
-            end
-    end.
-
-perf1(Elems, [{<<"last">>, Last}]) ->
-    case valid_time(Last) of
-        true ->
-            {ok, apply_query(Elems, ["LAST ", Last])};
-        false ->
-            {error, bad_last}
-    end;
-
-
-perf1(Elems, [{<<"after">>, After}, {<<"for">>, For}]) ->
-    case valid_pit(After) andalso valid_time(For) of
-        true ->
-            {ok, apply_query(Elems, ["AFTER ", After, " FOR ", For])};
-        false ->
-            {error, bad_after}
-    end;
-
-perf1(Elems, [{<<"before">>, Before}, {<<"for">>, For}]) ->
-    case valid_pit(Before) andalso valid_time(For) of
-        true ->
-            {ok, apply_query(Elems, ["BEFORE ", Before, " FOR ", For])};
-        false ->
-            {error, bad_before}
-    end;
-
-
-perf1(Elems, []) ->
-    {ok, apply_query(Elems, "LAST 1m")};
-
-perf1(_Elems, _) ->
-    {error, bad_qs}.
-
-perf_zone_id(<<Z:30/binary, _/binary>>) ->
-    Z.
+    wiggle_metrics:get(Elems, QS).
 
 perf_cpu(Zone) ->
-    [{[$', Zone | "'.'cpu'.'usage' BUCKET zone"], "cpu-usage"},
-     {[$', Zone | "'.'cpu'.'effective' BUCKET zone"], "cpu-effective"},
-     {[$', Zone | "'.'cpu'.'nwait' BUCKET zone"], "cpu-nwait"}].
+    [{"cpu-usage",     z([Zone, cpu, usage])},
+     {"cpu-effective", z([Zone, cpu, effective])},
+     {"cpu-nwait",     z([Zone, cpu, effective])}].
 
 perf_mem(Zone) ->
-    [{["divide('", Zone | "'.'mem'.'usage' BUCKET zone, 1048576)"],
-      "memory-usage"},
-     {["divide('", Zone | "'.'mem'.'value' BUCKET zone, 1048576)"],
-      "memory-value"}].
+    [{"memory-usage", mb([Zone, mem, usage])},
+     {"memory-value", mb([Zone, mem, value])}].
 
 perf_swap(Zone) ->
-    [{["divide('", Zone | "'.'swap'.'usage' BUCKET zone, 1048576)"], "swap-usage"},
-     {["divide('", Zone | "'.'swap'.'value' BUCKET zone, 1048576)"], "swap-value"}].
+    [{"memory-usage", mb([Zone, mem, usage])},
+     {"memory-value", mb([Zone, mem, value])}].
 
 perf_net(Zone, Nic) ->
-    [{["derivate('", Zone, "'.'net'.'", Nic, "'.'opackets64' BUCKET zone)"],
-      ["net-send-ops-", Nic]},
-     {["derivate('", Zone, "'.'net'.'", Nic, "'.'ipackets64' BUCKET zone)"],
-      ["net-recv-ops-", Nic]},
-     {["divide(derivate('", Zone, "'.'net'.'", Nic, "'.'obytes64' BUCKET zone), 1024)"],
-      ["net-send-kb-", Nic]},
-     {["divide(derivate('", Zone, "'.'net'.'", Nic, "'.'rbytes64' BUCKET zone), 1024)"],
-      ["net-recv-kb-", Nic]}].
+    [{["net-send-ops-", Nic], der([Zone, net, Nic, opackets64])},
+     {["net-recv-ops-", Nic], der([Zone, net, Nic, ipackets64])},
+     {["net-send-kb-", Nic],  der([Zone, net, Nic, obytes64])},
+     {["net-recv-kb-", Nic],  der([Zone, net, Nic, ubytes64])}].
+
 
 perf_zfs(Zone) ->
-    [{["divide(derivate('", Zone, "'.'zfs'.'nread' BUCKET zone), 1024)"], "zfs-read-kb"},
-     {["divide(derivate('", Zone, "'.'zfs'.'nwritten' BUCKET zone), 1024)"], "zfs-write-kb"},
-     {["derivate('", Zone, "'.'zfs'.'reads' BUCKET zone)"], "zfs-read-ops"},
-     {["derivate('", Zone, "'.'zfs'.'writes' BUCKET zone)"], "zfs-write-ops"}].
+    [{"zfs-read-kb",  {f, divide, [der([Zone, zfs, nread]), 1024]}},
+     {"zfs-write-kb", {f, divide, [der([Zone, zfs, nwritten]), 1024]}},
+     {"zfs-read-ops", der([Zone, zfs, reads])},
+     {"zfs-write-ops", der([Zone, zfs, writes])}].
 
-apply_aggr(Aggr, Res, Elements) ->
-    [{[Aggr, $(, Qry, ", ", Res, $)], Alias} ||
-        {Qry, Alias} <- Elements].
+z(L) ->
+    {m, zone, L}.
 
-apply_query(Elements, Range) ->
-    Elements1 = [[Qry, " AS '", Alias, "'"] || {Qry, Alias} <- Elements],
-    iolist_to_binary(["SELECT ", string:join(Elements1, ", "), " ", Range]).
+mb(L) ->
+    wiggle_metrics:mb(z(L)).
+
+der(L) ->
+    wiggle_metrics:der(z(L)).
