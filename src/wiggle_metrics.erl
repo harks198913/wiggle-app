@@ -89,7 +89,7 @@ translate({m, Bucket, L}) ->
               _ ->
                   [$', E, $']
           end || E <- L1],
-    [ string:join(L2, "."), " BUCKET '", string(Bucket), $'];
+    [string:join(L2, "."), " BUCKET '", string(Bucket), "'"];
 translate({f, F, Args}) ->
     [string(F), $(, string:join([translate(A) || A <- Args], ", "), $)];
 
