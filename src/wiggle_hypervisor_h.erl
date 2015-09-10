@@ -254,8 +254,7 @@ path_to_erl(P) ->
     [{N, C} || [{<<"cost">>, C}, {<<"name">>, N}] <- P, is_integer(C), is_binary(N), N /= <<>>].
 
 
-perf(UUID, QS) ->
-    Hv = wiggle_metrics:short_id(UUID),
+perf(Hv, QS) ->
     Elems = perf_cpu(Hv),
     wiggle_metrics:get(Elems, QS).
 

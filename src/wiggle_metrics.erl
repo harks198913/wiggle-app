@@ -8,10 +8,10 @@ short_id(ID) when is_binary(ID) ->
     ID.
 
 mb(E) ->
-  {f, divide, [E, 1048576]}.
+    {f, divide, [E, 1048576]}.
 
 der(E) ->
-  {f, derivate, [E]}.
+    {f, derivate, [E]}.
 
 get(Elems, QS) ->
     QS1 = lists:sort(QS),
@@ -28,7 +28,7 @@ get(Elems, QS) ->
                               {error, bad_resolution}
                       end
               end,
-        {ok, _T0, Res1} = dqe:run(Q),
+    {ok, _T0, Res1} = dqe:run(Q),
     [[{<<"n">>, Name},
       {<<"r">>, Resolution},
       {<<"v">>, mmath_bin:to_list(Data)}]
@@ -89,7 +89,7 @@ translate({m, Bucket, L}) ->
               _ ->
                   [$', E, $']
           end || E <- L1],
-    [ string:join(L2, "."), " BUCKET '", string(Bucket), $.];
+    [ string:join(L2, "."), " BUCKET '", string(Bucket), $'];
 translate({f, F, Args}) ->
     [string(F), $(, string:join([translate(A) || A <- Args], ", "), $)];
 
