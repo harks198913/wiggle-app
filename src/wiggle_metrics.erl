@@ -81,7 +81,7 @@ valid_time(_Time) ->
 valid_pit(_PIT) ->
     true. %% TODO
 
-translate({m, L, Bucket}) ->
+translate({m, Bucket, L}) ->
     L1 = [string(E) || E <- L],
     L2 = [case E of
               "*" ->
