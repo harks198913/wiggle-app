@@ -259,9 +259,12 @@ perf(Hv, QS) ->
     wiggle_metrics:get(Elems, QS).
 
 perf_cpu(Hv) ->
-    [{"cpu-kernel",  {f, sum, [h([Hv, cpu, "*", kernel])]}},
-     {"cpu-idle",    {f, sum, [h([Hv, cpu, "*", idle])]}},
-     {"cpu-user",    {f, sum, [h([Hv, cpu, "*", user])]}}].
+    [{"cpu-kernel",  cpu(Hv, kernel)},
+     {"cpu-idle",    cpu(Hv, idle)},
+     {"cpu-user",    cpu(Hv, user)}].
 
 h(L) ->
     {m, server, L}.
+
+cpu(Hv, Metric) ->
+    {f, derivate, {f, sum, [h([Hv, cpu, "*", Metric])]}}.
