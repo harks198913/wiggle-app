@@ -267,4 +267,4 @@ h(L) ->
     {m, server, L}.
 
 cpu(Hv, Metric) ->
-    {f, derivate, {f, sum, [h([Hv, cpu, "*", Metric])]}}.
+    {f, derivate, [{f, sum, [h([Hv, cpu, "*", Metric])]}]}.
