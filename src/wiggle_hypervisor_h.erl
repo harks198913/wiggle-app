@@ -21,6 +21,9 @@ allowed_methods(_Version, _Token, []) ->
 allowed_methods(_Version, _Token, [?UUID(_Hypervisor)]) ->
     [<<"GET">>, <<"DELETE">>];
 
+allowed_methods(?V2, _Token, [?UUID(_Hypervisor), <<"metrics">>| _]) ->
+    [<<"GET">>];
+
 allowed_methods(_Version, _Token, [?UUID(_Hypervisor), <<"config">>|_]) ->
     [<<"PUT">>];
 
@@ -35,6 +38,9 @@ allowed_methods(?V1, _Token, [?UUID(_Hypervisor), <<"services">>]) ->
 
 allowed_methods(_Version, _Token, [?UUID(_Hypervisor), <<"services">>]) ->
     [<<"PUT">>].
+
+get(#state{path = [?UUID(_Hypervisor), <<"metrics">>]}) ->
+    {ok, erlang:system_time(micro_seconds)};
 
 get(State = #state{path = [?UUID(Hypervisor) | _]}) ->
     Start = erlang:system_time(micro_seconds),
@@ -56,6 +62,10 @@ permission_required(#state{path = []}) ->
     {ok, [<<"cloud">>, <<"hypervisors">>, <<"list">>]};
 
 permission_required(#state{method = <<"GET">>, path = [?UUID(Hypervisor)]}) ->
+    {ok, [<<"hypervisors">>, Hypervisor, <<"get">>]};
+
+permission_required(#state{version = ?V2, method = <<"GET">>,
+                           path = [?UUID(Hypervisor), <<"metrics">> | _]}) ->
     {ok, [<<"hypervisors">>, Hypervisor, <<"get">>]};
 
 permission_required(#state{method = <<"DELETE">>, path = [?UUID(Hypervisor)]}) ->
@@ -115,8 +125,12 @@ read(Req, State = #state{path = [?UUID(_Hypervisor), <<"services">>, Service], o
     {jsxd:get([Service], [{}], ft_hypervisor:services(Obj)), Req, State};
 
 read(Req, State = #state{path = [?UUID(_Hypervisor)], obj = Obj}) ->
-    {ft_hypervisor:to_json(Obj), Req, State}.
+    {ft_hypervisor:to_json(Obj), Req, State};
 
+read(Req, State = #state{path = [?UUID(Hypervisor), <<"metrics">>]}) ->
+    {QS, Req1} = cowboy_req:qs_vals(Req),
+    JSON = perf(Hypervisor, QS),
+    {JSON, Req1, State}.
 
 %%--------------------------------------------------------------------
 %% PUT
@@ -234,7 +248,23 @@ delete(Req, State = #state{path = [?UUID(Hypervisor), <<"metadata">> | Path]}) -
     {true, Req, State}.
 
 %%--------------------------------------------------------------------
-%% DELETE
+%% Internal
 %%--------------------------------------------------------------------
 path_to_erl(P) ->
     [{N, C} || [{<<"cost">>, C}, {<<"name">>, N}] <- P, is_integer(C), is_binary(N), N /= <<>>].
+
+
+perf(Hv, QS) ->
+    Elems = perf_cpu(Hv),
+    wiggle_metrics:get(Elems, QS).
+
+perf_cpu(Hv) ->
+    [{"cpu-kernel",  cpu(Hv, kernel)},
+     {"cpu-idle",    cpu(Hv, idle)},
+     {"cpu-user",    cpu(Hv, user)}].
+
+h(L) ->
+    {m, server, L}.
+
+cpu(Hv, Metric) ->
+    {f, derivate, [{f, sum, [h([Hv, cpu, "*", Metric])]}]}.
