@@ -74,6 +74,22 @@
     {term(), Req :: term(), handler_state()}.
 
 
+
+-callback service_available(handler_state()) ->
+    true | false.
+-callback content_types_provided(handler_state()) ->
+    [{{binary(), binary(), [term()] | '*'}, atom()}].
+
+-callback content_types_accepted(handler_state()) ->
+    [{{binary(), binary(), [term()] | '*'}, atom()}].
+
+-callback schema(handler_state()) ->
+    none | atom().
+
+
+-optional_callbacks([service_available/1, schema/1,
+                     content_types_provided/1, content_types_accepted/1]).
+
 init(_Transport, _Req, _) ->
     {upgrade, protocol, cowboy_rest}.
 
@@ -84,14 +100,21 @@ rest_init(Req, [Module]) ->
 rest_terminate(_Req, _State) ->
     ok.
 
-service_available(Req, State) ->
-    {wiggle_h:service_available(), Req, State}.
+service_available(Req, State = #state{module = M}) ->
+    AFun = case erlang:function_exported(M, service_available, 1) of
+               true ->
+                   fun M:service_available/1;
+               false ->
+                   fun(_) -> wiggle_h:service_available() end
+           end,
+    {AFun(State), Req, State}.
 
 options(Req, State = #state{module = M}) ->
     Methods = M:allowed_methods(State#state.version,
                                 State#state.token,
                                 State#state.path),
     wiggle_h:options(Req, State,Methods).
+
 
 content_types_provided(Req, State = #state{module = M}) ->
     CTFun = case erlang:function_exported(M, content_types_provided, 1) of
