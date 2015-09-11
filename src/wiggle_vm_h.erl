@@ -13,9 +13,8 @@
          create/3,
          write/3,
          delete/2,
-         schema/1]).
-
--ignore_xref([schema/1]).
+         schema/1,
+         service_available/1]).
 
 -behaviour(wiggle_rest_h).
 
@@ -39,6 +38,10 @@
                 lager:error("Error: ~p", [GuardCallError]),
                 {false, Req, State}
         end).
+service_available(#state{path = [?UUID(_Vm), <<"metrics">>| _]}) ->
+    wiggle_h:service_available() andalso application:get_env(dqe, backend) =/= undefined;
+service_available(_) ->
+    wiggle_h:service_available().
 
 allowed_methods(_Version, _Token, []) ->
     [<<"GET">>, <<"POST">>];
@@ -457,8 +460,17 @@ read(Req, State = #state{path = [?UUID(_Vm)], obj = Obj}) ->
 
 read(Req, State = #state{path = [?UUID(Vm), <<"metrics">>]}) ->
     {QS, Req1} = cowboy_req:qs_vals(Req),
-    JSON = perf(Vm, QS),
-    {JSON, Req1, State}.
+    case perf(Vm, QS) of
+        {ok, JSON} ->
+            {JSON, Req1, State};
+        {error, no_server} ->
+            {ok, Req2} = cowboy_req:reply(503, [], <<"failed to connect to database">>, Req1),
+            {halt, Req2, State};
+        {error, bad_resolution} ->
+            {ok, Req2} = cowboy_req:reply(400, [], <<"bad resolution">>, Req1),
+            {halt, Req2, State}
+    end.
+
 
 
 %%--------------------------------------------------------------------

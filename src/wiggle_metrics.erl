@@ -16,23 +16,32 @@ der(E) ->
 get(Elems, QS) ->
     QS1 = lists:sort(QS),
     Elems1 = translate(Elems),
-    {ok, Q} = case lists:keytake(<<"aggr">>, 1, QS1) of
-                  false ->
-                      perf1(Elems1, QS1);
-                  {value, {<<"aggr">>, Res}, QS2} ->
-                      case valid_time(Res) of
-                          true ->
-                              Elems2 = apply_aggr("avg", Res, Elems1),
-                              perf1(Elems2, QS2);
-                          false ->
-                              {error, bad_resolution}
-                      end
-              end,
-    {ok, _T0, Res1} = dqe:run(Q),
-    [[{<<"n">>, Name},
-      {<<"r">>, Resolution},
-      {<<"v">>, mmath_bin:to_list(Data)}]
-     || {Name, Data, Resolution} <- Res1].
+    R1 = case lists:keytake(<<"aggr">>, 1, QS1) of
+             false ->
+                 perf1(Elems1, QS1);
+             {value, {<<"aggr">>, Res}, QS2} ->
+                 case valid_time(Res) of
+                     true ->
+                         Elems2 = apply_aggr("avg", Res, Elems1),
+                         perf1(Elems2, QS2);
+                     false ->
+                         {error, bad_resolution}
+                 end
+         end,
+    case R1 of
+        {ok, Q} ->
+            case dqe:run(Q) of
+                {ok, _T0, Res1} ->
+                    {ok, [[{<<"n">>, Name},
+                           {<<"r">>, Resolution},
+                           {<<"v">>, mmath_bin:to_list(Data)}]
+                          || {Name, Data, Resolution} <- Res1]};
+                {ok, []} ->
+                    {error, no_server}
+            end;
+        E ->
+            E
+    end.
 
 
 perf1(Elems, [{<<"last">>, Last}]) ->

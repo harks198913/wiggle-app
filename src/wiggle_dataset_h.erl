@@ -25,10 +25,6 @@
          content_types_accepted/1,
          content_types_provided/1]).
 
--ignore_xref([content_types_accepted/1,
-              content_types_provided/1,
-              raw_body/1]).
-
 -define(WRETRY, 5).
 
 allowed_methods(_Version, _Token, []) ->
