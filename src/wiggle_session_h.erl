@@ -83,8 +83,9 @@ create(Req, State = #state{path = [], version = ?V1}, Decoded) ->
                     _ ->
                         case libsnarl:auth(User, Pass) of
                             {ok, UUID} ->
-                                case ls_user:yubikeys(UUID) of
-                                    {ok, []} ->
+                                {ok, U} = ls_user:get(UUID),
+                                case ft_user:yubikeys(U) of
+                                    [] ->
                                         {ok, UUID};
                                     _ ->
                                         key_required
