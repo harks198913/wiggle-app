@@ -54,17 +54,17 @@ snarl_dispatch(true) ->
 snarl_dispatch(_) ->
     [].
 
+h(P, H) ->
+    {<<"/api/:version/", P/binary>>,   wiggle_rest_h, [H]}.
+
+hs(Hs) ->
+    [h(P, H) || {P, H} <- Hs].
 snarl_dispatch() ->
-    [{<<"/api/:version/users/[...]">>,
-      wiggle_rest_h, [wiggle_user_h]},
-     {<<"/api/:version/roles/[...]">>,
-      wiggle_rest_h, [wiggle_role_h]},
-     {<<"/api/:version/clients/[...]">>,
-      wiggle_rest_h, [wiggle_client_h]},
-     {<<"/api/:version/scope/[...]">>,
-      wiggle_rest_h, [wiggle_scope_h]},
-     {<<"/api/:version/orgs/[...]">>,
-      wiggle_rest_h, [wiggle_org_h]}].
+    hs([{<<"users/[...]">>,   wiggle_user_h},
+        {<<"roles/[...]">>,   wiggle_role_h},
+        {<<"clients/[...]">>, wiggle_client_h},
+        {<<"scopes/[...]">>,  wiggle_scope_h},
+        {<<"orgs/[...]">>,    wiggle_org_h}]).
 
 sniffle_dispatch(true) ->
     sniffle_dispatch();
@@ -72,42 +72,28 @@ sniffle_dispatch(_) ->
     [].
 
 sniffle_dispatch() ->
-    [{<<"/api/:version/cloud/[...]">>,
-      wiggle_rest_h, [wiggle_cloud_h]},
-     {<<"/api/:version/hypervisors/[...]">>,
-      wiggle_rest_h, [wiggle_hypervisor_h]},
-     {<<"/api/:version/dtrace/:uuid/stream">>,
-      wiggle_dtrace_stream, []},
-     {<<"/api/:version/dtrace/[...]">>,
-      wiggle_rest_h, [wiggle_dtrace_h]},
-     {<<"/api/:version/vms/:uuid/console">>,
-      wiggle_console_h, []},
-     {<<"/api/:version/vms/:uuid/vnc">>,
-      wiggle_vnc_h, []},
-     {<<"/api/:version/vms/[...]">>,
-      wiggle_rest_h, [wiggle_vm_h]},
-     {<<"/api/:version/ipranges/[...]">>,
-      wiggle_rest_h, [wiggle_iprange_h]},
-     {<<"/api/:version/networks/[...]">>,
-      wiggle_rest_h, [wiggle_network_h]},
-     {<<"/api/:version/groupings/[...]">>,
-      wiggle_rest_h, [wiggle_grouping_h]},
-     {<<"/api/:version/datasets/[...]">>,
-      wiggle_rest_h, [wiggle_dataset_h]},
-     {<<"/api/:version/packages/[...]">>,
-      wiggle_rest_h, [wiggle_package_h]}].
+    [{<<"/api/:version/vms/:uuid/console">>, wiggle_console_h, []},
+     {<<"/api/:version/vms/:uuid/vnc">>, wiggle_vnc_h, []},
+     {<<"/api/:version/dtrace/:uuid/stream">>, wiggle_dtrace_stream, []}] ++
+        hs([{<<"cloud/[...]">>,       wiggle_cloud_h},
+            {<<"hypervisors/[...]">>, wiggle_hypervisor_h},
+            {<<"dtrace/[...]">>,      wiggle_dtrace_h},
+            {<<"vms/[...]">>,         wiggle_vm_h},
+            {<<"ipranges/[...]">>,    wiggle_iprange_h},
+            {<<"networks/[...]">>,    wiggle_network_h},
+            {<<"groupings/[...]">>,   wiggle_grouping_h},
+            {<<"datasets/[...]">>,    wiggle_dataset_h},
+            {<<"packages/[...]">>,    wiggle_package_h}]).
 
 
 dispatches(API, UIDir) ->
     %% OAuth related rules
-    [{<<"/api/:version/oauth/token">>,
-      cowboy_oauth_token, []},
+    [{<<"/api/:version/oauth/token">>, cowboy_oauth_token, []},
      {<<"/api/:version/oauth/auth">>,
       cowboy_oauth_auth, [<<"/api/", ?V2/binary, "/oauth/2fa">>]},
      {<<"/api/:version/oauth/2fa">>,
       cowboy_oauth_2fa, []},
-     {<<"/api/:version/sessions/[...]">>,
-      wiggle_rest_h, [wiggle_session_h]}] ++
+     h(<<"sessions/[...]">>, wiggle_session)] ++
         %% Snarl related rules (we only exclude them if oauth is selected)
         snarl_dispatch(API =/= oauth) ++
         %% Sniffle realted rules (we only use them if all is selected)
