@@ -185,18 +185,14 @@ is_authorized(Req, State) ->
 forbidden(Req, State = #state{method = <<"OPTIONS">>}) ->
     {false, Req, State};
 
-forbidden(Req, State = #state{method = <<"GET">>,
-                              module = wiggle_cloud_h,
-                              path = [<<"connection">>]}) ->
-    {false, Req, State};
-
-forbidden(Req, State = #state{method = <<"POST">>,
-                              module = wiggle_session_h,
-                              path = []}) ->
-    {false, Req, State};
-
-forbidden(Req, State = #state{token = undefined}) ->
-    {true, Req, State};
+forbidden(Req, State = #state{token = undefined, module = M}) ->
+    F = case erlang:function_exported(M, authorization_required, 1) of
+            true ->
+                fun M:authorization_required/1;
+            false ->
+                fun(_) -> true end
+        end,
+    {F(State), Req, State};
 
 forbidden(Req, State = #state{module = M}) ->
     case M:permission_required(State) of
