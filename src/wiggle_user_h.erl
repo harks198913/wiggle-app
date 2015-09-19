@@ -29,10 +29,10 @@ allowed_methods(_V, _Token, [?UUID(_User)]) ->
 allowed_methods(_V, _Token, [?UUID(_User), <<"metadata">> | _]) ->
     [<<"PUT">>, <<"DELETE">>];
 
-allowed_methods(?V2, _Token, [?UUID(_User), <<"tokens">>]) ->
+allowed_methods(_V, _Token, [?UUID(_User), <<"tokens">>]) ->
     [<<"POST">>];
 
-allowed_methods(?V2, _Token, [?UUID(_User), <<"tokens">>, _Token]) ->
+allowed_methods(_V, _Token, [?UUID(_User), <<"tokens">>, _Token]) ->
     [<<"DELETE">>];
 
 allowed_methods(?V1, _Token, [?UUID(_User), <<"keys">>]) ->
@@ -53,7 +53,7 @@ allowed_methods(_V, _Token, [?UUID(_User), <<"yubikeys">>]) ->
 allowed_methods(_Version, _Token, [?UUID(_User), <<"yubikeys">>, _]) ->
     [<<"DELETE">>];
 
-allowed_methods(?V2, _Token, [?UUID(_User), <<"permissions">>]) ->
+allowed_methods(?V1, _Token, [?UUID(_User), <<"permissions">>]) ->
     [<<"GET">>];
 
 allowed_methods(_, _Token, [?UUID(_User), <<"permissions">> | _Permission]) ->
