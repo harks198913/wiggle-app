@@ -131,7 +131,7 @@ get(State = #state{method = <<"DELETE">>,
         not_found ->
             not_found;
         {ok, Obj} ->
-            case ft_user:get_token_by_id(Obj, Tkn) of
+            case ft_user:get_token_by_id(Tkn, Obj) of
                 not_found ->
                     not_found;
                 _ ->
