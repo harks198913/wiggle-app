@@ -61,6 +61,8 @@ snarl_dispatch() ->
       wiggle_rest_h, [wiggle_role_h]},
      {<<"/api/:version/clients/[...]">>,
       wiggle_rest_h, [wiggle_client_h]},
+     {<<"/api/:version/scope/[...]">>,
+      wiggle_rest_h, [wiggle_scope_h]},
      {<<"/api/:version/orgs/[...]">>,
       wiggle_rest_h, [wiggle_org_h]}].
 
