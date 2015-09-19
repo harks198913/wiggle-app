@@ -2,7 +2,7 @@
    ├─ cowboy─1.0.2
    │  ├─ cowlib─1.0.1
    │  └─ ranch─1.1.0
-   ├─ cowboy_oauth─0.2.8
+   ├─ cowboy_oauth─0.2.9
    │  ├─ erlydtl─0.0.0+build.757.reff8602ca
    │  │  └─ eunit_formatters─0.0.0+build.32.ref2c73eb6
    │  ├─ merl─1
@@ -15,7 +15,7 @@
    │  ├─ poolboy─1.5.1
    │  └─ qdate─0.3.0-pre
    │     ├─ erlang_localtime─1.0
-   │     └─ erlware_commons─0.15.0
+   │     └─ erlware_commons─0.16.0
    ├─ e2qc─1.0
    ├─ fifo_dt─0.1.52
    │  ├─ libsnarlmatch─0.1.6
