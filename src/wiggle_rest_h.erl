@@ -56,7 +56,7 @@
     [binary()].
 
 -callback get(handler_state()) ->
-    not_found | term().
+    not_found | {ok, term()}.
 
 -callback permission_required(handler_state()) ->
     {ok, [binary()] | always} | undefined.
@@ -77,17 +77,23 @@
 
 -callback service_available(handler_state()) ->
     true | false.
+
+-callback authorization_required(handler_state()) ->
+    true | false.
+
 -callback content_types_provided(handler_state()) ->
     [{{binary(), binary(), [term()] | '*'}, atom()}].
 
 -callback content_types_accepted(handler_state()) ->
     [{{binary(), binary(), [term()] | '*'}, atom()}].
 
+
+
 -callback schema(handler_state()) ->
     none | atom().
 
 
--optional_callbacks([service_available/1, schema/1,
+-optional_callbacks([service_available/1, schema/1, authorization_required/1,
                      content_types_provided/1, content_types_accepted/1]).
 
 init(_Transport, _Req, _) ->
@@ -151,37 +157,27 @@ resource_exists(Req, State = #state{module = M}) ->
             {true, Req, State#state{obj = Obj}}
     end.
 
--ifndef(old_hash).
-
 generate_etag(Req, State = #state{obj = undefined}) ->
     {undefined, Req, State};
 generate_etag(Req, State = #state{obj = Obj}) ->
     {{strong, base64:encode(crypto:hash(md5, term_to_binary(Obj)))}, Req, State}.
 
--else.
-
-generate_etag(Req, State = #state{obj = undefined}) ->
-    {undefined, Req, State};
-generate_etag(Req, State = #state{obj = Obj}) ->
-    {{strong, base64:encode(crypto:md5(term_to_binary(Obj)))}, Req, State}.
-
--endif.
-
 is_authorized(Req, State = #state{method = <<"OPTIONS">>}) ->
     {true, Req, State};
 
-is_authorized(Req, State = #state{method = <<"GET">>,
-                                  module = wiggle_cloud_h,
-                                  path = [<<"connection">>]}) ->
-    {true, Req, State};
-
-is_authorized(Req, State = #state{method = <<"POST">>,
-                                  module = wiggle_session_h,
-                                  path = []}) ->
-    {true, Req, State};
-
-is_authorized(Req, State = #state{token = undefined}) ->
-    {{false, <<"x-snarl-token">>}, Req, State};
+is_authorized(Req, State = #state{token = undefined, module = M}) ->
+    F = case erlang:function_exported(M, authorization_required, 1) of
+            true ->
+                fun M:authorization_required/1;
+            false ->
+                fun(_) -> true end
+        end,
+    case F(State) of
+        true ->
+            {{false, <<"authorization">>}, Req, State};
+        false ->
+            {true, Req, State}
+    end;
 
 is_authorized(Req, State) ->
     {true, Req, State}.

@@ -10,6 +10,7 @@
 
 -export([allowed_methods/3,
          permission_required/1,
+         authorization_required/1,
          get/1,
          create/3,
          read/2,
@@ -21,17 +22,21 @@
 allowed_methods(_, _Token, []) ->
     [<<"GET">>].
 
-get(_State)  ->
-    {ok, ls_oauth:scope()}.
+authorization_required(_State) ->
+    false.
 
 permission_required(_State) ->
     {ok, always}.
+
+get(_State)  ->
+    not_found.
 
 %%--------------------------------------------------------------------
 %% GET
 %%--------------------------------------------------------------------
 
 read(Req, State = #state{path = [], obj = Scopes}) ->
+    Scopes = ls_oauth:scope(),
     {to_json(Scopes), Req, State}.
 
 %%--------------------------------------------------------------------
