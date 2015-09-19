@@ -116,7 +116,7 @@ auth([{<<"bearer">>, Bearer}], State) ->
                 {undefined, _} ->
                     {error, State};
                 {UUID, Scope} ->
-                    SPerms = wiggle_h:scope_perms(ls_oauth:scope(Scope), []),
+                    SPerms = cowboy_oauth:scope_perms(ls_oauth:scope(Scope), []),
                     State1 = State#dstate{token = UUID, scope_perms = SPerms},
                     {ok, State1}
             end;

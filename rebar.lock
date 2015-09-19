@@ -5,7 +5,7 @@
  {<<"cowboy">>,{pkg,<<"cowboy">>,<<"1.0.2">>},0},
  {<<"cowboy_oauth">>,
   {git,"https://github.com/project-fifo/cowoby_oauth.git",
-       {ref,"43b61354dfd4c400936af7086f6d9890f97b4c96"}},
+       {ref,"8c93d0b7aac4b8538558247216365d3c10b8842b"}},
   0},
  {<<"cowlib">>,{pkg,<<"cowlib">>,<<"1.0.1">>},1},
  {<<"ddb_client">>,{pkg,<<"ddb_client">>,<<"0.1.12">>},1},

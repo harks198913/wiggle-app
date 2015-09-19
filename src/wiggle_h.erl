@@ -17,7 +17,6 @@
          clear_permissions/1,
          timeout_cache_with_invalid/6,
          timeout_cache/5,
-         scope_perms/2,
          list/9,
          allowed/2
         ]).
@@ -114,17 +113,18 @@ get_header(State = #state{version = ?V1}, Req) ->
                     {State, Req1}
             end;
         {<<"bearer">>, Bearer} ->
-            resolve_bearer(State#state{bearer = Bearer}, Req1);
+            State1 = resolve_bearer(State#state{bearer = Bearer}),
+            {State1, Req1};
         _ ->
             get_qs(State, Req1)
     end;
 
 get_header(State, Req) ->
-    case cowboy_req:parse_header(<<"authorization">>, Req) of
-        {ok, {<<"bearer">>, Bearer}, Req1} ->
-            resolve_bearer(State#state{bearer = Bearer}, Req1);
-        {ok, _, Req1} ->
-            get_qs(State, Req1)
+    case cowboy_oauth:get_token(Req) of
+        {undefined, Req1} ->
+            get_qs(State, Req1);
+        {{UUID, _Client, SPerms}, Req1} ->
+            {State#state{token = UUID, scope_perms = SPerms}, Req1}
     end.
 
 %%Handle fifo_ott (One time token) query strings, resolve the OTT to a
@@ -137,7 +137,8 @@ get_qs(State, Req) ->
             case ls_token:get(OTT) of
                 {ok, Bearer} ->
                     ls_token:delete(OTT),
-                    resolve_bearer(State#state{bearer = Bearer}, Req1);
+                    State1 = resolve_bearer(State#state{bearer = Bearer}),
+                    {State1, Req1};
                 _ ->
                     get_cookie(State, Req1)
             end
@@ -155,26 +156,13 @@ get_cookie(State, Req) ->
     {State, Req}.
 
 
-resolve_bearer(State = #state{bearer = Bearer}, Req) ->
-    case ls_oauth:verify_access_token(Bearer) of
-        {ok, Context} ->
-            case {proplists:get_value(<<"resource_owner">>, Context),
-                  proplists:get_value(<<"scope">>, Context)} of
-                {undefined, _} ->
-                    {State, Req};
-                {UUID, Scope} ->
-                    SPerms = scope_perms(ls_oauth:scope(Scope), []),
-                    {State#state{token = UUID, scope_perms = SPerms}, Req}
-            end;
-        E ->
-            lager:warning("[oauth] could not resolve bearer: ~p", [E]),
-            {State, Req}
+resolve_bearer(State = #state{bearer = Bearer}) ->
+    case cowboy_oauth:resolve_bearer(Bearer) of
+        undefined ->
+            State;
+        {UUID, _Client, SPerms} ->
+            State#state{token = UUID, scope_perms = SPerms}
     end.
-
-scope_perms([], Acc) ->
-    lists:usort(Acc);
-scope_perms([{_, _, _, Perms} | R], Acc) ->
-    scope_perms(R, Acc ++ Perms).
 
 full_list(Req) ->
     case cowboy_req:qs_val(<<"full-list">>, Req) of
