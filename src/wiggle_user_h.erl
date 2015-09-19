@@ -29,6 +29,12 @@ allowed_methods(_V, _Token, [?UUID(_User)]) ->
 allowed_methods(_V, _Token, [?UUID(_User), <<"metadata">> | _]) ->
     [<<"PUT">>, <<"DELETE">>];
 
+allowed_methods(_V, _Token, [?UUID(_User), <<"tokens">>]) ->
+    [<<"POST">>];
+
+allowed_methods(_V, _Token, [?UUID(_User), <<"tokens">>, _TokenID]) ->
+    [<<"DELETE">>];
+
 allowed_methods(?V1, _Token, [?UUID(_User), <<"keys">>]) ->
     [<<"GET">>, <<"PUT">>];
 
@@ -47,7 +53,7 @@ allowed_methods(_V, _Token, [?UUID(_User), <<"yubikeys">>]) ->
 allowed_methods(_Version, _Token, [?UUID(_User), <<"yubikeys">>, _]) ->
     [<<"DELETE">>];
 
-allowed_methods(?V2, _Token, [?UUID(_User), <<"permissions">>]) ->
+allowed_methods(?V1, _Token, [?UUID(_User), <<"permissions">>]) ->
     [<<"GET">>];
 
 allowed_methods(_, _Token, [?UUID(_User), <<"permissions">> | _Permission]) ->
@@ -119,6 +125,20 @@ get(State = #state{method = <<"PUT">>, path = [?UUID(User), <<"roles">>, Role]})
             end
     end;
 
+get(State = #state{method = <<"DELETE">>,
+                   path = [?UUID(User), <<"tokens">>, Tkn]}) ->
+    case wiggle_user_h:get(State#state{path = [?UUID(User)]}) of
+        not_found ->
+            not_found;
+        {ok, Obj} ->
+            case ft_user:get_token_by_id(Tkn, Obj) of
+                not_found ->
+                    not_found;
+                _ ->
+                    {ok, Obj}
+            end
+    end;
+
 get(State = #state{path = [?UUID(User) | _]}) ->
     Start = erlang:system_time(micro_seconds),
     R = case application:get_env(wiggle, user_ttl) of
@@ -151,6 +171,14 @@ permission_required(#state{method = <<"GET">>,
                            path = [?UUID(User), <<"permissions">> | _]}) ->
     {ok, [<<"users">>, User, <<"get">>]};
 
+permission_required(#state{method = <<"POST">>,
+                           path = [?UUID(User), <<"tokens">>]}) ->
+    {ok, [<<"users">>, User, <<"edit">>]};
+
+permission_required(#state{method = <<"DELETE">>,
+                           path = [?UUID(User), <<"tokens">>, _Token]}) ->
+    {ok, [<<"users">>, User, <<"edit">>]};
+ 
 permission_required(#state{method = <<"PUT">>,
                            path = [?UUID(User), <<"permissions">> | Permission]}) ->
     {multiple, [[<<"users">>, User, <<"grant">>], Permission]};
@@ -226,7 +254,8 @@ permission_required(_State) ->
 %% GET
 %%--------------------------------------------------------------------
 
-read(Req, State = #state{token = Token, path = [], full_list=FullList, full_list_fields=Filter}) ->
+read(Req, State = #state{token = Token, path = [], full_list=FullList,
+                         full_list_fields=Filter}) ->
     Start = erlang:system_time(micro_seconds),
     {ok, Permissions} = wiggle_h:get_permissions(Token),
     ?MSnarl(?P(State), Start),
@@ -281,14 +310,13 @@ read(Req, State = #state{version = ?V1, obj = UserObj,
     {ft_user:yubikeys(UserObj), Req, State}.
 
 %%--------------------------------------------------------------------
-%% PUT
+%% POST
 %%--------------------------------------------------------------------
 
-create(Req, State = #state{token = Token, path = [], version = Version}, Decoded) ->
+create(Req, State = #state{token = Token, path = [], version = Version},
+       [{<<"password">>, Pass}, {<<"user">>, User}]) ->
     {ok, Creator} = ls_user:get(Token),
     CUUID = ft_user:uuid(Creator),
-    {ok, User} = jsxd:get(<<"user">>, Decoded),
-    {ok, Pass} = jsxd:get(<<"password">>, Decoded),
     Start = erlang:system_time(micro_seconds),
     {ok, UUID} = ls_user:add(CUUID, User),
     ?MSnarl(?P(State), Start),
@@ -297,7 +325,36 @@ create(Req, State = #state{token = Token, path = [], version = Version}, Decoded
     e2qc:teardown(?LIST_CACHE),
     e2qc:teardown(?FULL_CACHE),
     ?MSnarl(?P(State), Start1),
-    {{true, <<"/api/", Version/binary, "/users/", UUID/binary>>}, Req, State#state{body = Decoded}}.
+    {{true, <<"/api/", Version/binary, "/users/", UUID/binary>>}, Req, State};
+
+create(Req, State = #state{path = [?UUID(User), <<"tokens">>], version = ?V2},
+       [{<<"comment">>, Comment}, {<<"scope">>, Scope}]) ->
+    case ls_user:api_token(User, Scope, Comment) of
+        not_found ->
+            {ok, Req1} = cowboy_req:reply(404, [], <<"User not found">>, Req),
+            {halt, Req1, State};
+        {error, bad_scope} ->
+            {ok, Req1} = cowboy_req:reply(404, [], <<"Bad scope">>, Req),
+            {halt, Req1, State};
+        {ok, TokenID, Token} ->
+            e2qc:evict(?CACHE, User),
+            e2qc:teardown(?FULL_CACHE),
+            MediaType =
+                case cowboy_req:meta(media_type, Req) of
+                    {<<"application">>, <<"x-msgpack">>, _} ->
+                        msgpack;
+                    {<<"application">>, <<"json">>, _} ->
+                        json
+                end,
+            J = [{<<"token">>, Token}, {<<"token-id">>, TokenID}],
+            {Body, Req1} = wiggle_h:encode(J, MediaType, Req),
+            {ok, Req2} = cowboy_req:reply(200, [], Body, Req1),
+            {halt, Req2, State}
+    end.
+
+%%--------------------------------------------------------------------
+%% Put
+%%--------------------------------------------------------------------
 
 write(Req, State = #state{path =  [?UUID(User)]}, [{<<"password">>, Password}]) ->
     Start = erlang:system_time(micro_seconds),
@@ -460,6 +517,14 @@ delete(Req, State = #state{path = [?UUID(User), <<"orgs">>, Org]}) ->
 delete(Req, State = #state{path = [?UUID(User), <<"roles">>, Role]}) ->
     Start = erlang:system_time(micro_seconds),
     ok = ls_user:leave(User, Role),
+    e2qc:evict(?CACHE, User),
+    e2qc:teardown(?FULL_CACHE),
+    ?MSnarl(?P(State), Start),
+    {true, Req, State};
+
+delete(Req, State = #state{path = [?UUID(User), <<"tokens">>, TokenID]}) ->
+    Start = erlang:system_time(micro_seconds),
+    ok = ls_user:revoke_token(User, TokenID),
     e2qc:evict(?CACHE, User),
     e2qc:teardown(?FULL_CACHE),
     ?MSnarl(?P(State), Start),

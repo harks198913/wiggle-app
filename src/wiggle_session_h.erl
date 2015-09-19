@@ -10,6 +10,7 @@
 
 -export([allowed_methods/3,
          permission_required/1,
+         authorization_required/1,
          get/1,
          create/3,
          read/2,
@@ -45,6 +46,12 @@ get(State = #state{path = [Session], version = ?V1}) ->
 
 get(_State) ->
     not_found.
+
+authorization_required(#state{method = <<"POST">>}) ->
+    false;
+
+authorization_required(_) ->
+    true.
 
 permission_required(_State) ->
     {ok, always}.
@@ -83,8 +90,9 @@ create(Req, State = #state{path = [], version = ?V1}, Decoded) ->
                     _ ->
                         case libsnarl:auth(User, Pass) of
                             {ok, UUID} ->
-                                case ls_user:yubikeys(UUID) of
-                                    {ok, []} ->
+                                {ok, U} = ls_user:get(UUID),
+                                case ft_user:yubikeys(U) of
+                                    [] ->
                                         {ok, UUID};
                                     _ ->
                                         key_required
