@@ -4,7 +4,6 @@
 
 -export([start/0,
          dispatches/2,
-         auth_dispatch/1,
          snarl_dispatch/0,
          snarl_dispatch/1,
          sniffle_dispatch/0,
@@ -12,7 +11,6 @@
 
 -ignore_xref([start/0,
               dispatches/2,
-              auth_dispatch/1,
               snarl_dispatch/0,
               snarl_dispatch/1,
               sniffle_dispatch/0,
@@ -40,17 +38,6 @@ start() ->
     application:start(wiggle).
 
 
-auth_dispatch(V) ->
-    [{<<"/api/:version/oauth/token">>,
-      cowboy_oauth_token, []},
-     {<<"/api/:version/oauth/auth">>,
-      cowboy_oauth_auth, [<<"/api/", V/binary, "/oauth/2fa">>]},
-     {<<"/api/:version/oauth/2fa">>,
-      cowboy_oauth_2fa, []},
-     {<<"/api/:version/sessions/[...]">>,
-      wiggle_rest_h, [wiggle_session_h]}].
-snarl_dispatch(true) ->
-    snarl_dispatch();
 snarl_dispatch(_) ->
     [].
 
@@ -93,7 +80,7 @@ dispatches(API, UIDir) ->
       cowboy_oauth_auth, [<<"/api/", ?V2/binary, "/oauth/2fa">>]},
      {<<"/api/:version/oauth/2fa">>,
       cowboy_oauth_2fa, []},
-     h(<<"sessions/[...]">>, wiggle_session)] ++
+     h(<<"sessions/[...]">>, wiggle_session_h)] ++
         %% Snarl related rules (we only exclude them if oauth is selected)
         snarl_dispatch(API =/= oauth) ++
         %% Sniffle realted rules (we only use them if all is selected)
