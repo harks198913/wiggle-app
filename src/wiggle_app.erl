@@ -8,8 +8,8 @@
 %% Application callbacks
 -export([start/2, stop/1]).
 
--export([dispatchs/0]).
--ignore_xref([dispatchs/0]).
+-export([dispatches/0]).
+-ignore_xref([dispatches/0]).
 %% ===================================================================
 %% Application callbacks
 %% ===================================================================
@@ -22,7 +22,7 @@ start(_StartType, _StartArgs) ->
             {ok, Port} = application:get_env(wiggle, port),
             {ok, Compression} = application:get_env(wiggle, compression),
             {ok, Acceptors} = application:get_env(wiggle, acceptors),
-            DPRules = dispatchs(),
+            DPRules = dispatches(),
             Dispatch = cowboy_router:compile([{'_', DPRules}]),
 
             {ok, _} = cowboy:start_http(http, Acceptors, [{port, Port}],
@@ -82,66 +82,12 @@ load_schemas() ->
                 end, []),
     lager:info("[schemas] Loaded schemas: ~p", [Schemas]).
 
-dispatchs() ->
+dispatches() ->
     API = application:get_env(wiggle, api, all),
-    %% OAuth related rules
-    [
-     {<<"/api/:version/oauth/token">>,
-      cowboy_oauth_token, []},
-     {<<"/api/:version/oauth/auth">>,
-      cowboy_oauth_auth, [<<"/api/", ?V2/binary, "/oauth/2fa">>]},
-     {<<"/api/:version/oauth/2fa">>,
-      cowboy_oauth_2fa, []},
-     {<<"/api/:version/sessions/[...]">>,
-      wiggle_rest_h, [wiggle_session_h]}] ++
-        %% Snarl related rules (we only exclude them if oauth is selected)
-        case API of
-            oauth2 ->
-                [];
-            _ ->
-                [{<<"/api/:version/users/[...]">>,
-                  wiggle_rest_h, [wiggle_user_h]},
-                 {<<"/api/:version/roles/[...]">>,
-                  wiggle_rest_h, [wiggle_role_h]},
-                 {<<"/api/:version/clients/[...]">>,
-                  wiggle_rest_h, [wiggle_client_h]},
-                 {<<"/api/:version/orgs/[...]">>,
-                  wiggle_rest_h, [wiggle_org_h]}]
-        end ++
-        %% Sniffle realted rules (we only use them if all is selected)
-        case API of
-            all ->
-                [{<<"/api/:version/cloud/[...]">>,
-                  wiggle_rest_h, [wiggle_cloud_h]},
-                 {<<"/api/:version/hypervisors/[...]">>,
-                  wiggle_rest_h, [wiggle_hypervisor_h]},
-                 {<<"/api/:version/dtrace/:uuid/stream">>,
-                  wiggle_dtrace_stream, []},
-                 {<<"/api/:version/dtrace/[...]">>,
-                  wiggle_rest_h, [wiggle_dtrace_h]},
-                 {<<"/api/:version/vms/:uuid/console">>,
-                  wiggle_console_h, []},
-                 {<<"/api/:version/vms/:uuid/vnc">>,
-                  wiggle_vnc_h, []},
-                 {<<"/api/:version/vms/[...]">>,
-                  wiggle_rest_h, [wiggle_vm_h]},
-                 {<<"/api/:version/ipranges/[...]">>,
-                  wiggle_rest_h, [wiggle_iprange_h]},
-                 {<<"/api/:version/networks/[...]">>,
-                  wiggle_rest_h, [wiggle_network_h]},
-                 {<<"/api/:version/groupings/[...]">>,
-                  wiggle_rest_h, [wiggle_grouping_h]},
-                 {<<"/api/:version/datasets/[...]">>,
-                  wiggle_rest_h, [wiggle_dataset_h]},
-                 {<<"/api/:version/packages/[...]">>,
-                  wiggle_rest_h, [wiggle_package_h]}];
-            _ ->
-                []
-        end ++
-        case application:get_env(wiggle, ui_path) of
-            {ok, UIDir} ->
-                [{"/", cowboy_static, {file, filename:join(UIDir, "index.html")}},
-                 {"/[...]", cowboy_static, {dir, UIDir}}];
-            _ ->
-                []
-        end.
+    UIDir = case application:get_env(wiggle, ui_path) of
+                {ok, D} ->
+                    D;
+                _ ->
+                    undefined
+            end,
+    wiggle:dispatches(API, UIDir).
