@@ -32,7 +32,7 @@ allowed_methods(_V, _Token, [?UUID(_User), <<"metadata">> | _]) ->
 allowed_methods(_V, _Token, [?UUID(_User), <<"tokens">>]) ->
     [<<"POST">>];
 
-allowed_methods(_V, _Token, [?UUID(_User), <<"tokens">>, _Token]) ->
+allowed_methods(_V, _Token, [?UUID(_User), <<"tokens">>, _TokenID]) ->
     [<<"DELETE">>];
 
 allowed_methods(?V1, _Token, [?UUID(_User), <<"keys">>]) ->
