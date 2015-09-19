@@ -38,6 +38,8 @@ start() ->
     application:start(wiggle).
 
 
+snarl_dispatch(true) ->
+    snarl_dispatch();
 snarl_dispatch(_) ->
     [].
 
@@ -55,6 +57,7 @@ snarl_dispatch() ->
 
 sniffle_dispatch(true) ->
     sniffle_dispatch();
+
 sniffle_dispatch(_) ->
     [].
 
