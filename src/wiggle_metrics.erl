@@ -30,14 +30,14 @@ get(Elems, QS) ->
          end,
     case R1 of
         {ok, Q} ->
-            case dqe:run(Q) of
+            case dqe:run(binary_to_list(Q)) of
                 {ok, _T0, Res1} ->
                     {ok, [[{<<"n">>, Name},
                            {<<"r">>, Resolution},
                            {<<"v">>, mmath_bin:to_list(Data)}]
                           || {Name, Data, Resolution} <- Res1]};
-                {ok, []} ->
-                    {error, no_server}
+                {error, E} ->
+                    {error, E}
             end;
         E ->
             E
@@ -84,8 +84,8 @@ apply_query(Elements, Range) ->
     Elements1 = [[Qry, " AS '", Alias, "'"] || {Qry, Alias} <- Elements],
     iolist_to_binary(["SELECT ", string:join(Elements1, ", "), " ", Range]).
 
-valid_time(_Time) ->
-    true. %% TODO!
+valid_time(Time) ->
+    re:run(Time, "[0-9]+[mhdw]?") =/= nomatch.
 
 valid_pit(_PIT) ->
     true. %% TODO

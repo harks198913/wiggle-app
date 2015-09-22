@@ -336,20 +336,20 @@ create(Req, State = #state{path = [?UUID(User), <<"tokens">>], version = ?V2},
         {error, bad_scope} ->
             {ok, Req1} = cowboy_req:reply(404, [], <<"Bad scope">>, Req),
             {halt, Req1, State};
-        {ok, TokenID, Token} ->
+        {ok, {TokenID, Token}} ->
             e2qc:evict(?CACHE, User),
             e2qc:teardown(?FULL_CACHE),
-            MediaType =
+            {MediaType, Req1} =
                 case cowboy_req:meta(media_type, Req) of
-                    {<<"application">>, <<"x-msgpack">>, _} ->
-                        msgpack;
-                    {<<"application">>, <<"json">>, _} ->
-                        json
+                    {{<<"application">>, <<"x-msgpack">>, _}, ReqX} ->
+                        {msgpack, ReqX};
+                    {{<<"application">>, <<"json">>, _}, ReqX} ->
+                        {json, ReqX}
                 end,
             J = [{<<"token">>, Token}, {<<"token-id">>, TokenID}],
-            {Body, Req1} = wiggle_h:encode(J, MediaType, Req),
-            {ok, Req2} = cowboy_req:reply(200, [], Body, Req1),
-            {halt, Req2, State}
+            {Body, Req2} = wiggle_h:encode(J, MediaType, Req1),
+            {ok, Req3} = cowboy_req:reply(200, [], Body, Req2),
+            {halt, Req3, State}
     end.
 
 %%--------------------------------------------------------------------

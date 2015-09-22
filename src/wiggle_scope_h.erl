@@ -36,7 +36,7 @@ get(_State)  ->
 %%--------------------------------------------------------------------
 
 read(Req, State = #state{path = []}) ->
-    Scopes = ls_oauth:scope(),
+    {ok, Scopes} = ls_oauth:scope(),
     {to_json(Scopes), Req, State}.
 
 %%--------------------------------------------------------------------

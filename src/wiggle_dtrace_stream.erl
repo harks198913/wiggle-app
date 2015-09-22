@@ -116,7 +116,8 @@ auth([{<<"bearer">>, Bearer}], State) ->
                 {undefined, _} ->
                     {error, State};
                 {UUID, Scope} ->
-                    SPerms = cowboy_oauth:scope_perms(ls_oauth:scope(Scope), []),
+                    {ok, Scopes} = ls_oauth:scope(Scope),
+                    SPerms = cowboy_oauth:scope_perms(Scopes, []),
                     State1 = State#dstate{token = UUID, scope_perms = SPerms},
                     {ok, State1}
             end;
