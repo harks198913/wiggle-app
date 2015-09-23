@@ -124,7 +124,10 @@ get_header(State, Req) ->
         {undefined, Req1} ->
             get_qs(State, Req1);
         {{UUID, _Client, SPerms}, Req1} ->
-            {State#state{token = UUID, scope_perms = SPerms}, Req1}
+            {ok, {<<"bearer">>, Bearer}, Req2} =
+                cowboy_req:parse_header(<<"authorization">>, Req1),
+            {State#state{token = UUID, scope_perms = SPerms, bearer = Bearer},
+             Req2}
     end.
 
 %%Handle fifo_ott (One time token) query strings, resolve the OTT to a
