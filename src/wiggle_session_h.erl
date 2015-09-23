@@ -34,7 +34,7 @@ allowed_methods(?V1, _Token, [_Session]) ->
 allowed_methods(?V2, _Token, [_Session]) ->
     [<<"DELETE">>].
 
-get(#state{path = [<<"one_time_token">>], version = ?V2,
+get(#state{version = ?V2, path = [<<"one_time_token">>],
            bearer = Bearer}) when is_binary(Bearer) ->
     {ok, {oauth2_token:generate('x-snarl-one-time-token'), Bearer}};
 
