@@ -164,11 +164,11 @@ write(Req, State = #state{path = [?UUID(Iprange)]}, _) ->
     case ls_iprange:claim(Iprange) of
         {ok, {Tag, IP, Netmask, Gateway, VLAN}} ->
             JSON = [
-                    {tag, Tag},
-                    {ip, ls_iprange:ip_to_bin(IP)},
-                    {netmask, ls_iprange:ip_to_bin(Netmask)},
-                    {gateway, ls_iprange:ip_to_bin(Gateway)},
-                    {vlan, VLAN}
+                    {<<"tag">>, Tag},
+                    {<<"ip">>, ls_iprange:ip_to_bin(IP)},
+                    {<<"netmask">>, ls_iprange:ip_to_bin(Netmask)},
+                    {<<"gateway">>, ls_iprange:ip_to_bin(Gateway)},
+                    {<<"vlan">>, VLAN}
                    ],
             {Encoder, ContentType, Req2} =
                 case cowboy_req:header(<<"accept">>, Req) of
