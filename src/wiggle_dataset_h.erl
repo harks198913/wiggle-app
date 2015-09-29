@@ -105,7 +105,7 @@ permission_required(#state{method = <<"PUT">>, version = ?V2,
                            path = [?UUID(Dataset), <<"networks">>, _]}) ->
     {ok, [<<"datasets">>, Dataset, <<"edit">>]};
 
-permission_required(#state{method = <<"DELETE">>, version = ?V1,
+permission_required(#state{method = <<"DELETE">>, version = ?V2,
                            path = [?UUID(Dataset), <<"networks">>, _]}) ->
     {ok, [<<"datasets">>, Dataset, <<"edit">>]};
 
