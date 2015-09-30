@@ -290,11 +290,19 @@ delete(Req, State = #state{path = [?UUID(Dataset), <<"metadata">> | Path]}) ->
 delete(Req, State = #state{version = ?V2,
                            path = [?UUID(Dataset), <<"networks">>, Nic]}) ->
     Start = erlang:system_time(micro_seconds),
-    ok = ls_dataset:remove_network(Dataset, Nic),
-    e2qc:evict(?CACHE, Dataset),
-    e2qc:teardown(?FULL_CACHE),
-    ?MSniffle(?P(State), Start),
-    {true, Req, State};
+    {ok, D} = ls_dataset:get(Dataset),
+    Ns = [N || N = {ANic, _} <- ft_dataset:networks(D), ANic =:= Nic],
+    case Ns of
+        [N] ->
+            ok = ls_dataset:remove_network(Dataset, N),
+            e2qc:evict(?CACHE, Dataset),
+            e2qc:teardown(?FULL_CACHE),
+            ?MSniffle(?P(State), Start),
+            {true, Req, State};
+        _ ->
+            {false, Req, State}
+    end;
+
 
 delete(Req, State = #state{path = [?UUID(Dataset)]}) ->
     Start = erlang:system_time(micro_seconds),
