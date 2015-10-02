@@ -7,11 +7,11 @@
    │  │  └─ eunit_formatters─0.1.2+build.32.ref2c73eb6
    │  ├─ merl─1
    │  └─ oauth2─0.6.0
-   ├─ dqe─0.1.19
-   │  ├─ ddb_client─0.1.14
+   ├─ dqe─0.1.20
+   │  ├─ ddb_client─0.1.16
    │  ├─ dflow─0.1.5
-   │  ├─ dproto─0.1.10
-   │  ├─ mmath─0.1.14
+   │  ├─ dproto─0.1.12
+   │  ├─ mmath─0.1.15
    │  ├─ poolboy─1.5.1
    │  └─ qdate─0.3.0-pre
    │     ├─ erlang_localtime─1.0
@@ -24,7 +24,7 @@
    │  ├─ base16─1.0
    │  └─ erlcloud─0.8.6
    ├─ fifo_spec─0.1.21
-   ├─ folsom_ddb─0.1.18
+   ├─ folsom_ddb─0.1.19
    ├─ jesse─1.1.5
    ├─ jsx─1.4.5
    ├─ jsxd─0.1.10
