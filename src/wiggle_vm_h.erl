@@ -463,6 +463,9 @@ read(Req, State = #state{path = [?UUID(Vm), <<"metrics">>]}) ->
     case perf(Vm, QS) of
         {ok, JSON} ->
             {JSON, Req1, State};
+        {error, no_results} ->
+            {ok, Req2} = cowboy_req:reply(503, [], <<"Empty result set">>, Req1),
+            {halt, Req2, State};
         {error, no_server} ->
             {ok, Req2} = cowboy_req:reply(503, [], <<"failed to connect to database">>, Req1),
             {halt, Req2, State};
