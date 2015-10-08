@@ -132,11 +132,12 @@ read(Req, State = #state{path = [?UUID(Hypervisor), <<"metrics">>]}) ->
     case perf(Hypervisor, QS) of
         {ok, JSON} ->
             {JSON, Req1, State};
+        {error, no_results} ->
+            {ok, Req2} = cowboy_req:reply(503, [], <<"Empty result set">>, Req1),
+            {halt, Req2, State};
         {error, no_server} ->
             {ok, Req2} = cowboy_req:reply(503, [], <<"failed to connect to database">>, Req1),
             {halt, Req2, State};
-        {error,no_results} ->
-            {[{}], Req1, State};
         {error, bad_resolution} ->
             {ok, Req2} = cowboy_req:reply(400, [], <<"bad resolution">>, Req1),
             {halt, Req2, State}
