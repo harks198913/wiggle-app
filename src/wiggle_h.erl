@@ -217,8 +217,10 @@ content_type(Req) ->
             {msgpack, Req1};
         {<<"application/json", _/binary>>, Req1} ->
             {json, Req1};
+        {undefined, Req1} ->
+            {json, Req1};
         {Oops, Req1} ->
-            lager:warning("[content_type] Unknown media_type: ~p", [Oops]),
+            lager:info("[content_type] Unknown media_type: ~p", [Oops]),
             {json, Req1}
     end.
 
