@@ -28,6 +28,42 @@ e(Code, Msg, Req) ->
     {ok, Req1} = cowboy_req:reply(Code, [], Msg, Req),
     {shutdown, Req1}.
 
+
+%% Fuck you dialyzer, it refuses to accept that get_token can
+%% return stuff other then no_token ...
+-dialyzer({nowarn_function, [get_token/2]}).
+-spec get_token(Req) ->
+                       {ok, binary(), [[binary()]], Req} |
+                       {denied, Req} |
+                       {no_token, Req}
+                           when Req :: cowboy_req:req().
+get_token(Req) ->
+    case cowboy_req:qs_val(<<"fifo_ott">>, Req) of
+        {OTT, Req1} when is_binary(OTT) ->
+            case ls_token:get(OTT) of
+                {ok, Bearer} ->
+                    ls_token:delete(OTT),
+                    case ls_oauth:verify_access_token(Bearer) of
+                        {ok, Context} ->
+                            case {proplists:get_value(<<"resource_owner">>, Context),
+                                  proplists:get_value(<<"scope">>, Context)} of
+                                {undefined, _} ->
+                                    {denied, Req1};
+                                {UUID, Scope} ->
+                                    {ok, Scopes} = ls_oauth:scope(Scope),
+                                    SPerms = cowboy_oauth:scope_perms(Scopes, []),
+                                    {ok, UUID, SPerms, Req1}
+                            end;
+                        _ ->
+                            {denied, Req1}
+                    end;
+                _ ->
+                    {denied, Req1}
+            end;
+        {undefined, Req1} ->
+            {no_token, Req1}
+    end.
+
 websocket_init(_Any, Req, []) ->
     Req0 = case cowboy_req:parse_header(<<"sec-websocket-protocol">>, Req) of
                {ok, undefined, ReqR} ->
@@ -39,12 +75,9 @@ websocket_init(_Any, Req, []) ->
            end,
     {ID, Req1} = cowboy_req:binding(uuid, Req0),
     Req2 = wiggle_h:set_access_header(Req1),
-    {#state{token = Token, scope_perms = SPerms}, Req3} =
-        wiggle_h:get_token(#state{}, Req2),
-    case Token of
-        undefined ->
-            e(401, Req3);
-        Token ->
+
+    case get_token(Req2) of
+        {ok, Token, SPerms, Req3} ->
             Permission = [<<"vms">>, ID, <<"console">>],
             case libsnarlmatch:test_perms(Permission, SPerms)
                 andalso libsnarl:allowed(Token, Permission) of
@@ -66,7 +99,9 @@ websocket_init(_Any, Req, []) ->
                     end;
                 false ->
                     e(401, Req3)
-            end
+            end;
+        {_Error, Req3} ->
+            e(401, Req3)
     end.
 
 bf(F, A) ->
