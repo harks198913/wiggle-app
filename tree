@@ -7,7 +7,7 @@
    │  │  └─ eunit_formatters─0.1.2+build.32.ref2c73eb6
    │  ├─ merl─1
    │  └─ oauth2─0.6.0
-   ├─ dqe─0.1.21
+   ├─ dqe─0.1.22
    │  ├─ ddb_client─0.1.17
    │  ├─ dflow─0.1.5
    │  ├─ dproto─0.1.12
@@ -24,7 +24,7 @@
    │  ├─ base16─1.0
    │  └─ erlcloud─0.8.6
    ├─ fifo_spec─0.1.21
-   ├─ folsom_ddb─0.1.19
+   ├─ folsom_ddb─0.1.20
    ├─ jesse─1.1.5
    ├─ jsx─1.4.5
    ├─ jsxd─0.1.10
