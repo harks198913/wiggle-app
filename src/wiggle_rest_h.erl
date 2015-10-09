@@ -233,6 +233,8 @@ read_msgpack(Req, State) ->
 
 read(Req, raw, State = #state{module = M}) ->
     case M:read(Req, State) of
+        {halt, _Req, _State} = Reply ->
+            Reply;
         {{chunked, _StreamFun}, _Req, _State} = Reply ->
             Reply;
         {Data, Req1, State1} ->
@@ -243,6 +245,8 @@ read(Req, raw, State = #state{module = M}) ->
 
 read(Req, MediaType, State = #state{module = M}) ->
     case M:read(Req, State) of
+        {halt, _Req, _State} = Reply ->
+            Reply;
         {{chunked, _StreamFun}, _Req, _State} = Reply ->
             Reply;
         {Reply, Req1, State1} ->
