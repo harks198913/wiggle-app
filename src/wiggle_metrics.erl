@@ -43,7 +43,6 @@ get(Elems, QS) ->
             E
     end.
 
-
 perf1(Elems, [{<<"last">>, Last}]) ->
     case valid_time(Last) of
         true ->
