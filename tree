@@ -7,8 +7,8 @@
    │  │  └─ eunit_formatters─0.1.2+build.32.ref2c73eb6
    │  ├─ merl─1
    │  └─ oauth2─0.6.0
-   ├─ dqe─0.1.20
-   │  ├─ ddb_client─0.1.16
+   ├─ dqe─0.1.21
+   │  ├─ ddb_client─0.1.17
    │  ├─ dflow─0.1.5
    │  ├─ dproto─0.1.12
    │  ├─ mmath─0.1.15
