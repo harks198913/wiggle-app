@@ -4,7 +4,7 @@
    │  └─ ranch─1.1.0
    ├─ cowboy_oauth─0.2.11
    │  ├─ erlydtl─0.9.2+build.760.ref5ac24d1
-   │  │  └─ eunit_formatters─0.1.2+build.32.ref2c73eb6
+   │  │  └─ eunit_formatters─0.1.2+build.37.ref35e3e6a
    │  ├─ merl─1
    │  └─ oauth2─0.6.0
    ├─ dqe─0.1.22
@@ -17,7 +17,7 @@
    │     ├─ erlang_localtime─1.0
    │     └─ erlware_commons─0.16.0
    ├─ e2qc─1.0
-   ├─ fifo_dt─0.1.54
+   ├─ fifo_dt─0.1.55
    │  ├─ libsnarlmatch─0.1.6
    │  └─ riak_dt─2.1.0
    ├─ fifo_s3─0.1.13
