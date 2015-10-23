@@ -7,19 +7,19 @@
    │  │  └─ eunit_formatters─0.1.2+build.37.ref35e3e6a
    │  ├─ merl─1
    │  └─ oauth2─0.6.0
-   ├─ dqe─0.1.22
+   ├─ dqe─0.1.23
    │  ├─ ddb_client─0.1.17
    │  ├─ dflow─0.1.5
    │  ├─ dproto─0.1.12
-   │  ├─ mmath─0.1.15
+   │  ├─ mmath─0.1.16
    │  ├─ poolboy─1.5.1
    │  └─ qdate─0.3.0-pre
    │     ├─ erlang_localtime─1.0
    │     └─ erlware_commons─0.16.0
    ├─ e2qc─1.0
    ├─ fifo_dt─0.1.55
-   │  ├─ libsnarlmatch─0.1.6
-   │  └─ riak_dt─2.1.0
+   │  ├─ libsnarlmatch─0.1.7
+   │  └─ riak_dt─2.1.1
    ├─ fifo_s3─0.1.13
    │  ├─ base16─1.0
    │  └─ erlcloud─0.8.6
@@ -32,7 +32,7 @@
    │  └─ goldrush─0.1.7
    ├─ lager_watchdog─0.1.10
    ├─ libchunter─0.1.40
-   ├─ libsnarl─0.3.32
+   ├─ libsnarl─0.3.33
    │  └─ mdns_client_lib─0.1.28
    │     ├─ mdns_client─0.1.7
    │     └─ pooler─1.4.0
