@@ -74,7 +74,7 @@ permission_required(_State) ->
 
 %% Creates a VM
 schema(#state{method = <<"PUT">>, path = []}) ->
-    vm_create;
+    package_create;
 
 schema(_State) ->
     none.
