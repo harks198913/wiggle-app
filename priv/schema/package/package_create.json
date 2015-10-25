@@ -1,0 +1,87 @@
+{
+  "$schema": "http://json-schema.org/draft-03/schema#",
+  "description": "Create a PAckage",
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string",
+      "required": "true"
+    },
+    "cpu_cap": {
+      "type": "integer",
+      "required": "true",
+      "exclusiveMinimum": 0
+    },
+    "quota": {
+      "type": "integer",
+      "required": "true",
+      "exclusiveMinimum": 0
+    },
+    "ram": {
+      "type": "integer",
+      "required": "true",
+      "exclusiveMinimum": 0
+    },
+
+
+    "max_swap": {
+      "type": "integer",
+      "exclusiveMinimum": 0
+    },
+    "zfs_io_priority": {
+      "type": "integer",
+      "exclusiveMinimum": 0
+    },
+    "blocksize": {
+      "type": "integer",
+      "exclusiveMinimum": 0
+    },
+    "compression": {
+      "type": "string",
+      "enum": ["on", "off", "lz4", "lzjb", "zle",
+               "gzip", "gzip-1", "gzip-2", "gzip-3", "gzip-4",
+               "gzip-5", "gzip-6", "gzip-7", "gzip-8", "gzip-9"]
+    },
+
+    "requirements": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "weight": {
+            "type": ["string", "integer"],
+            "required": true
+          },
+          "condition": {
+            "type": "string",
+            "enum": [">=", ">", "=<", "<", "=:=", "=/=", "subset", "superset", "disjoint", "element", "allowed"],
+            "required": true
+          },
+          "low": {
+            "type": "integer"
+          },
+          "high": {
+            "type": "integer"
+          },
+          "attribute": {
+            "type": "string"
+          },
+          "value": {
+            "type": "any"
+          }
+        }
+      }
+    },
+    "org": {
+      "type": "object",
+      "patternProperties": {
+        "\\d+": {
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "required": true
+        }
+      }
+    }
+
+  }
+}
