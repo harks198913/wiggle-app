@@ -15,7 +15,8 @@
          read/2,
          create/3,
          write/3,
-         delete/2]).
+         delete/2,
+         schema/1]).
 
 -behaviour(wiggle_rest_h).
 
@@ -35,6 +36,9 @@ allowed_methods(_Version, _Token, [?UUID(_Org), <<"triggers">> | _Trigger]) ->
     [<<"POST">>, <<"DELETE">>];
 
 allowed_methods(_Version, _Token, [?UUID(_Org), <<"metadata">> | _]) ->
+    [<<"PUT">>, <<"DELETE">>];
+
+allowed_methods(_Version, _Token, [?UUID(_Org), <<"resources">>, _]) ->
     [<<"PUT">>, <<"DELETE">>].
 
 get(State = #state{path = [?UUID(Org) | _]}) ->
@@ -126,15 +130,35 @@ permission_required(#state{method = <<"DELETE">>,
                            path = [?UUID(Org), <<"metadata">> | _]}) ->
     {ok, [<<"orgs">>, Org, <<"edit">>]};
 
+permission_required(#state{method = <<"PUT">>,
+                           path = [?UUID(Org), <<"resources">>, _]}) ->
+    {ok, [<<"orgs">>, Org, <<"edit">>]};
+
+permission_required(#state{method = <<"DELETE">>,
+                           path = [?UUID(Org), <<"resources">>, _]}) ->
+    {ok, [<<"orgs">>, Org, <<"edit">>]};
+
 permission_required(State) ->
     lager:warning("Unknown permission request: ~p.", [State]),
     undefined.
 
 %%--------------------------------------------------------------------
+%% Schema
+%%--------------------------------------------------------------------
+
+%% Creates a VM
+schema(#state{method = <<"PUT">>, path = [?UUID(_Org), <<"resources">>, _]}) ->
+    org_resource_change;
+
+schema(_State) ->
+    none.
+
+%%--------------------------------------------------------------------
 %% GET
 %%--------------------------------------------------------------------
 
-read(Req, State = #state{token = Token, path = [], full_list=FullList, full_list_fields=Filter}) ->
+read(Req, State = #state{token = Token, path = [], full_list=FullList,
+                         full_list_fields=Filter}) ->
     Start = erlang:system_time(micro_seconds),
     {ok, Permissions} = wiggle_h:get_permissions(Token),
     ?MSnarl(?P(State), Start),
@@ -176,6 +200,7 @@ acc_to_js({Timestamp, Action, Resource, Metadata}) ->
      {<<"resource">>, Resource},
      {<<"timestamp">>, Timestamp}
     ].
+
 %%--------------------------------------------------------------------
 %% PUT
 %%--------------------------------------------------------------------
@@ -208,6 +233,22 @@ write(Req, State = #state{path = [?UUID(Org), <<"metadata">> | Path]}, [{K, V}])
   when is_binary(Org) ->
     Start = erlang:system_time(micro_seconds),
     ls_org:set_metadata(Org, [{[<<"public">> | Path] ++ [K], jsxd:from_list(V)}]),
+    e2qc:evict(?CACHE, Org),
+    e2qc:teardown(?FULL_CACHE),
+    ?MSnarl(?P(State), Start),
+    {true, Req, State};
+
+write(Req, State = #state{path = [?UUID(Org), <<"resources">>, R]},
+      [{Act, V}])
+  when is_integer(V),
+       (Act =:= <<"inc">> orelse Act =:= <<"dec">>) ->
+    Start = erlang:system_time(micro_seconds),
+    case Act of
+        <<"inc">> ->
+            ls_org:resource_inc(Org, R, V);
+        <<"dec">> ->
+            ls_org:resource_dec(Org, R, V)
+    end,
     e2qc:evict(?CACHE, Org),
     e2qc:teardown(?FULL_CACHE),
     ?MSnarl(?P(State), Start),

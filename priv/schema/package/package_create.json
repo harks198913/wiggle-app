@@ -2,39 +2,37 @@
   "$schema": "http://json-schema.org/draft-03/schema#",
   "description": "Create a PAckage",
   "type": "object",
+  "required": ["name", "cpu_cap", "ram"],
   "properties": {
+
     "name": {
-      "type": "string",
-      "required": "true"
+      "type": "string"
     },
     "cpu_cap": {
       "type": "integer",
-      "required": "true",
-      "exclusiveMinimum": 0
+      "maximum": 1
     },
     "quota": {
       "type": "integer",
-      "required": "true",
-      "exclusiveMinimum": 0
+      "minimum": 0
     },
     "ram": {
       "type": "integer",
-      "required": "true",
-      "exclusiveMinimum": 0
+      "minimum": 0
     },
 
 
     "max_swap": {
       "type": "integer",
-      "exclusiveMinimum": 0
+      "minimum": 0
     },
     "zfs_io_priority": {
       "type": "integer",
-      "exclusiveMinimum": 0
+      "minimum": 0
     },
     "blocksize": {
       "type": "integer",
-      "exclusiveMinimum": 0
+      "minimum": 0
     },
     "compression": {
       "type": "string",
@@ -42,20 +40,20 @@
                "gzip", "gzip-1", "gzip-2", "gzip-3", "gzip-4",
                "gzip-5", "gzip-6", "gzip-7", "gzip-8", "gzip-9"]
     },
-
     "requirements": {
       "type": "array",
       "items": {
         "type": "object",
+        "required": ["weight", "condition"],
         "properties": {
           "weight": {
-            "type": ["string", "integer"],
-            "required": true
+            "type": ["string", "integer"]
           },
           "condition": {
             "type": "string",
-            "enum": [">=", ">", "=<", "<", "=:=", "=/=", "subset", "superset", "disjoint", "element", "allowed"],
-            "required": true
+            "enum": [">=", ">", "=<", "<", "=:=", "=/=",
+                     "subset", "superset", "disjoint", "element",
+                     "allowed"]
           },
           "low": {
             "type": "integer"
@@ -67,7 +65,7 @@
             "type": "string"
           },
           "value": {
-            "type": "any"
+            "type": ["string", "integer", "array"]
           }
         }
       }
@@ -77,11 +75,9 @@
       "patternProperties": {
         "\\d+": {
           "type": "integer",
-          "exclusiveMinimum": 0,
-          "required": true
+          "minimum": 0
         }
       }
     }
-
   }
 }

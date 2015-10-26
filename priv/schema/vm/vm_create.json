@@ -2,20 +2,19 @@
   "$schema": "http://json-schema.org/draft-03/schema#",
   "description": "Create a new VM",
   "type": "object",
+  "required": ["dataset", "package", "config"],
   "properties": {
     "dataset": {
       "type": "string",
-      "pattern": "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}",
-      "required": true
+      "pattern": "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}"
     },
     "package": {
       "type": "string",
-      "pattern": "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}",
-      "required": true
+      "pattern": "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}"
     },
     "config": {
       "type": "object",
-      "required": true,
+      "required": ["alias"],
       "properties": {
         "autoboot": {
           "type": "boolean"
@@ -26,8 +25,7 @@
           "pattern": "^(([a-zA-Z0-9]|[a-zA-Z0-9][a-zA-Z0-9\\-]*[a-zA-Z0-9])\\.)*([A-Za-z0-9]|[A-Za-z0-9][A-Za-z0-9\\-]*[A-Za-z0-9])$"
         },
         "alias": {
-          "type": "string",
-          "required": "true"
+          "type": "string"
         },
         "routes": {
           "type": "array",
@@ -65,15 +63,16 @@
           "type": "array",
           "items": {
             "type": "object",
+            "required": ["weight", "condition"],
             "properties": {
               "weight": {
-                "type": ["string", "integer"],
-                "required": true
+                "type": ["string", "integer"]
               },
               "condition": {
                 "type": "string",
-                "enum": [">=", ">", "=<", "<", "=:=", "=/=", "subset", "superset", "disjoint", "element", "allowed"],
-                "required": true
+                "enum": [">=", ">", "=<", "<", "=:=", "=/=",
+                         "subset", "superset", "disjoint", "element",
+                         "allowed"]
               },
               "low": {
                 "type": "integer"
@@ -85,7 +84,7 @@
                 "type": "string"
               },
               "value": {
-                "type": "any"
+                "type": ["string", "integer", "array"]
               }
             }
           }
@@ -95,8 +94,7 @@
           "patternProperties": {
             "net\\d+": {
               "type": "string",
-              "pattern": "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}",
-              "required": true
+              "pattern": "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}"
             }
           }
         }
