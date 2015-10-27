@@ -18,14 +18,6 @@
 
 -behaviour(wiggle_rest_h).
 
--define(GUARD_CALL(Call),
-        case Call of
-            ok ->
-                true;
-            GuardCallError ->
-                lager:error("Error: ~p", [GuardCallError]),
-                false
-        end).
 
 -define(LIB(Call),
         Start = erlang:system_time(micro_seconds),
@@ -393,8 +385,7 @@ schema(#state{method = <<"POST">>,
               path = [?UUID(_Vm), <<"backups">>, ?UUID(_Backup)]}) ->
     vm_rollback_backup;
 
-
-%% Dry Run
+%% State change
 schema(#state{method = <<"POST">>, path = [?UUID(_Vm), <<"services">>]}) ->
     vm_service_change;
 

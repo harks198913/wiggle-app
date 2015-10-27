@@ -14,7 +14,8 @@
          read/2,
          create/3,
          write/3,
-         delete/2]).
+         delete/2,
+         schema/1]).
 
 -behaviour(wiggle_rest_h).
 
@@ -68,6 +69,17 @@ permission_required(_State) ->
     undefined.
 
 %%--------------------------------------------------------------------
+%% Schema
+%%--------------------------------------------------------------------
+
+%% Creates a VM
+schema(#state{method = <<"PUT">>, path = []}) ->
+    package_create;
+
+schema(_State) ->
+    none.
+
+%%--------------------------------------------------------------------
 %% GET
 %%--------------------------------------------------------------------
 
@@ -107,13 +119,10 @@ create(Req, State = #state{path = [], version = Version}, Data) ->
                {<<"blocksize">>, fun ls_package:blocksize/2},
                {<<"compression">>, fun ls_package:compression/2}
               ], UUID, Data),
-            case jsxd:get(<<"requirements">>, Data) of
-                {ok, Rs} ->
-                    [ls_package:add_requirement(UUID, fifo_dt:js2req(R))
-                     || R <- Rs];
-                _ ->
-                    ok
-            end,
+            [ls_package:add_requirement(UUID, fifo_dt:js2req(R))
+             || R <- jsxd:get(<<"requirements">>, [], Data)],
+            [ls_package:org_resource_inc(UUID, R, V)
+             || {R, V} <- jsxd:get(<<"org">>, [], Data)],
             e2qc:teardown(?LIST_CACHE),
             e2qc:teardown(?FULL_CACHE),
             {{true, <<"/api/", Version/binary, "/packages/", UUID/binary>>}, Req, State#state{body = Data}};
