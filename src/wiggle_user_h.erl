@@ -350,7 +350,33 @@ create(Req, State = #state{path = [?UUID(User), <<"tokens">>], version = ?V2},
             {Body, Req2} = wiggle_h:encode(J, MediaType, Req1),
             {ok, Req3} = cowboy_req:reply(200, [], Body, Req2),
             {halt, Req3, State}
+    end;
+
+create(Req, State = #state{path = [?UUID(User), <<"tokens">>], version = ?V2},
+       [{<<"comment">>, Comment}, {<<"scope">>, Scope}, {<<"csr">>, CSR}]) ->
+    case ls_user:sign_csr(User, Scope, Comment, CSR) of
+        not_found ->
+            {ok, Req1} = cowboy_req:reply(404, [], <<"User not found">>, Req),
+            {halt, Req1, State};
+        {error, bad_scope} ->
+            {ok, Req1} = cowboy_req:reply(404, [], <<"Bad scope">>, Req),
+            {halt, Req1, State};
+        {ok, {TokenID, Cert}} ->
+            e2qc:evict(?CACHE, User),
+            e2qc:teardown(?FULL_CACHE),
+            {MediaType, Req1} =
+                case cowboy_req:meta(media_type, Req) of
+                    {{<<"application">>, <<"x-msgpack">>, _}, ReqX} ->
+                        {msgpack, ReqX};
+                    {{<<"application">>, <<"json">>, _}, ReqX} ->
+                        {json, ReqX}
+                end,
+            J = [{<<"cert">>, Cert}, {<<"token-id">>, TokenID}],
+            {Body, Req2} = wiggle_h:encode(J, MediaType, Req1),
+            {ok, Req3} = cowboy_req:reply(200, [], Body, Req2),
+            {halt, Req3, State}
     end.
+
 
 %%--------------------------------------------------------------------
 %% Put
