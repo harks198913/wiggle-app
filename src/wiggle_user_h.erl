@@ -353,7 +353,7 @@ create(Req, State = #state{path = [?UUID(User), <<"tokens">>], version = ?V2},
     end;
 
 create(Req, State = #state{path = [?UUID(User), <<"tokens">>], version = ?V2},
-       [{<<"comment">>, Comment}, {<<"scope">>, Scope}, {<<"csr">>, CSR}]) ->
+       [{<<"comment">>, Comment}, {<<"csr">>, CSR}, {<<"scope">>, Scope}]) ->
     case ls_user:sign_csr(User, Scope, Comment, CSR) of
         not_found ->
             {ok, Req1} = cowboy_req:reply(404, [], <<"User not found">>, Req),
