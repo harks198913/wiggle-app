@@ -146,7 +146,7 @@ permission_required(State) ->
 %% Schema
 %%--------------------------------------------------------------------
 
-%% Creates a VM
+%% Change resources
 schema(#state{method = <<"PUT">>, path = [?UUID(_Org), <<"resources">>, _]}) ->
     org_resource_change;
 

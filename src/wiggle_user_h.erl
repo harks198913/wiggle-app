@@ -16,7 +16,8 @@
          create/3,
          write/3,
          delete/2,
-         to_json/1]).
+         to_json/1,
+         schema/1]).
 
 -behaviour(wiggle_rest_h).
 
@@ -250,6 +251,16 @@ permission_required(#state{method = <<"DELETE">>,
 permission_required(_State) ->
     undefined.
 
+%%--------------------------------------------------------------------
+%% Schema
+%%--------------------------------------------------------------------
+
+%% Add SSH key
+schema(#state{method = <<"PUT">>, path = [?UUID(_User), <<"keys">>]}) ->
+    user_add_key;
+
+schema(_State) ->
+    none.
 %%--------------------------------------------------------------------
 %% GET
 %%--------------------------------------------------------------------
