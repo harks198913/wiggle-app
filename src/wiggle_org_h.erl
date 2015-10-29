@@ -26,9 +26,6 @@ allowed_methods(_Version, _Token, []) ->
 allowed_methods(_Version, _Token, [?UUID(_Org)]) ->
     [<<"GET">>, <<"PUT">>, <<"DELETE">>];
 
-allowed_methods(?V1, _Token, [?UUID(_Org), <<"triggers">>]) ->
-    [<<"GET">>];
-
 allowed_methods(?V2, _Token, [?UUID(_Org), <<"accounting">>]) ->
     [<<"GET">>];
 
@@ -75,10 +72,6 @@ permission_required(#state{method = <<"PUT">>, path = [?UUID(Org)]}) ->
 
 permission_required(#state{method = <<"DELETE">>, path = [?UUID(Org)]}) ->
     {ok, [<<"orgs">>, Org, <<"delete">>]};
-
-permission_required(#state{version = ?V1, method = <<"GET">>,
-                           path = [?UUID(Org), <<"triggers">>]}) ->
-    {ok, [<<"orgs">>, Org, <<"get">>]};
 
 permission_required(#state{method = <<"POST">>,
                            path = [?UUID(_Org), <<"triggers">> | _],
@@ -146,7 +139,7 @@ permission_required(State) ->
 %% Schema
 %%--------------------------------------------------------------------
 
-%% Creates a VM
+%% Change resources
 schema(#state{method = <<"PUT">>, path = [?UUID(_Org), <<"resources">>, _]}) ->
     org_resource_change;
 
@@ -187,11 +180,7 @@ read(Req, State = #state{path = [?UUID(Org), <<"accounting">>]}) ->
             {[acc_to_js(E) || E <- Data], Req1, State};
         _ ->
             {false, Req1, State}
-    end;
-
-read(Req, State = #state{version = ?V1, path = [?UUID(_Org), <<"triggers">>],
-                         obj = OrgObj}) ->
-    {jsxd:get(<<"triggers">>, [], to_json(OrgObj)), Req, State}.
+    end.
 
 acc_to_js({Timestamp, Action, Resource, Metadata}) ->
     [

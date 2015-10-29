@@ -25,9 +25,6 @@ allowed_methods(_Version, _Token, []) ->
 allowed_methods(_Version, _Token, [?UUID(_Role)]) ->
     [<<"GET">>, <<"PUT">>, <<"DELETE">>];
 
-allowed_methods(?V1, _Token, [?UUID(_Role), <<"permissions">>]) ->
-    [<<"GET">>];
-
 allowed_methods(_Version, _Token, [?UUID(_Role), <<"metadata">> | _]) ->
     [<<"PUT">>, <<"DELETE">>];
 
@@ -76,10 +73,6 @@ permission_required(#state{method = <<"PUT">>, path = [?UUID(Role)]}) ->
 permission_required(#state{method = <<"DELETE">>, path = [?UUID(Role)]}) ->
     {ok, [<<"roles">>, Role, <<"delete">>]};
 
-permission_required(#state{version = ?V1, method = <<"GET">>,
-                           path = [?UUID(Role), <<"permissions">>]}) ->
-    {ok, [<<"roles">>, Role, <<"get">>]};
-
 permission_required(#state{method = <<"PUT">>, path = [?UUID(Role), <<"permissions">> | Permission]}) ->
     {multiple, [[<<"roles">>, Role, <<"grant">>],
                 [<<"permissions">>, Permission, <<"grant">>]]};
@@ -118,10 +111,7 @@ read(Req, State = #state{token = Token, path = [], full_list=FullList, full_list
     {Res, Req, State};
 
 read(Req, State = #state{path = [?UUID(_Role)], obj = RoleObj}) ->
-    {to_json(RoleObj), Req, State};
-
-read(Req, State = #state{version = ?V1, path = [?UUID(_Role), <<"permissions">>], obj = RoleObj}) ->
-    {ft_role:permissions(RoleObj), Req, State}.
+    {to_json(RoleObj), Req, State}.
 
 %%--------------------------------------------------------------------
 %% PUT

@@ -73,7 +73,7 @@
   0},
  {<<"libsnarl">>,
   {git,"https://github.com/project-fifo/libsnarl.git",
-       {ref,"ac7f38b53580dee9094451e9821b3530612fe776"}},
+       {ref,"1d0c2d664a370c248fc89f90985e6fa42fa3dbc2"}},
   0},
  {<<"libsnarlmatch">>,{pkg,<<"libsnarlmatch">>,<<"0.1.7">>},1},
  {<<"libsniffle">>,

@@ -1,0 +1,11 @@
+{
+  "$schema": "http://json-schema.org/draft-03/schema#",
+  "description": "Add a SSH key to a user",
+  "type": "object",
+  "additionalProperties": false,
+  "patternProperties": {
+    "^[a-zA-Z@_.,-]+$": {
+      "pattern": "^[^ ]+ [^ ]+ [^ ]+$"
+    }
+  }
+}
