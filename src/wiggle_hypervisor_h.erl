@@ -33,8 +33,6 @@ allowed_methods(_Version, _Token, [?UUID(_Hypervisor), <<"characteristics">>|_])
 allowed_methods(_Version, _Token, [?UUID(_Hypervisor), <<"metadata">>|_]) ->
     [<<"PUT">>, <<"DELETE">>];
 
-allowed_methods(?V1, _Token, [?UUID(_Hypervisor), <<"services">>]) ->
-    [<<"PUT">>, <<"GET">>];
 
 allowed_methods(_Version, _Token, [?UUID(_Hypervisor), <<"services">>]) ->
     [<<"PUT">>].
@@ -86,9 +84,6 @@ permission_required(#state{method = <<"PUT">>, path = [?UUID(Hypervisor), <<"cha
 permission_required(#state{method = <<"DELETE">>, path = [?UUID(Hypervisor), <<"characteristics">> | _]}) ->
     {ok, [<<"hypervisors">>, Hypervisor, <<"edit">>]};
 
-permission_required(#state{version = ?V1, method = <<"GET">>,
-                           path = [?UUID(Hypervisor), <<"services">>]}) ->
-    {ok, [<<"hypervisors">>, Hypervisor, <<"get">>]};
 
 permission_required(#state{method = <<"PUT">>, path = [?UUID(Hypervisor), <<"services">>]}) ->
     {ok, [<<"hypervisors">>, Hypervisor, <<"edit">>]};
@@ -114,12 +109,6 @@ read(Req, State = #state{token = Token, path = [], full_list=FullList, full_list
                         ?LIST_CACHE),
     ?MSniffle(?P(State), Start1),
     {Res, Req, State};
-
-read(Req, State = #state{version = ?V1, path = [?UUID(_Hypervisor), <<"services">>], obj = Obj}) ->
-    Services = jsxd:fold(fun(UUID, Snap, Acc) ->
-                                 [jsxd:set(<<"uuid">>, UUID, Snap) | Acc]
-                         end, [], ft_hypervisor:services(Obj)),
-    {Services, Req, State};
 
 read(Req, State = #state{path = [?UUID(_Hypervisor), <<"services">>, Service], obj = Obj}) ->
     {jsxd:get([Service], [{}], ft_hypervisor:services(Obj)), Req, State};

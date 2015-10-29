@@ -43,15 +43,11 @@ allowed_tkn(Perm, #state{token = Token}) ->
 initial_state(Req) ->
     {Method, Req0} = cowboy_req:method(Req),
     {Version, Req1} = cowboy_req:binding(version, Req0),
-    VersionI = case Version of
-                   ?V1 -> 1;
-                   _ ->
-                       try
-                           binary_to_integer(Version)
-                       catch
-                           _:_ ->
-                               0
-                       end
+    VersionI = try
+                   binary_to_integer(Version)
+               catch
+                   _:_ ->
+                       0
                end,
     {Path, Req2} = cowboy_req:path_info(Req1),
     {PathB, Req3} = cowboy_req:path(Req2),
@@ -68,56 +64,22 @@ initial_state(Req) ->
                 full_list_fields = FullListFields
                },
     {State1, Req6} = get_token(State, Req5),
-    Req7 = case State1 of
-               #state{token = {token, Tkn}} ->
-                   cowboy_req:set_resp_header(<<"x-snarl-token">>, Tkn, Req6);
-               _ ->
-                   Req6
-           end,
-    {ok, set_access_header(Req7), State1}.
+    {ok, set_access_header(Req6), State1}.
 
 set_access_header(Req) ->
     Req1 = cowboy_req:set_resp_header(
              <<"access-control-allow-origin">>, <<"*">>, Req),
     Req2 = cowboy_req:set_resp_header(
              <<"access-control-allow-headers">>,
-             <<"Authorization, content-type, x-snarl-token, x-full-list, x-full-list-fields">>, Req1),
+             <<"Authorization, content-type, x-full-list, x-full-list-fields">>, Req1),
     Req3 = cowboy_req:set_resp_header(
              <<"access-control-expose-headers">>,
-             <<"x-snarl-token, x-full-list, x-full-list-fields">>, Req2),
+             <<"x-full-list, x-full-list-fields">>, Req2),
     cowboy_req:set_resp_header(
       <<"access-control-allow-credentials">>, <<"true">>, Req3).
 
-
-%% We only support the x-snarl-token in the V1 API.
-get_token(State = #state{version = ?V1}, Req) ->
-    case cowboy_req:header(<<"x-snarl-token">>, Req) of
-        {undefined, Req1} ->
-            get_header(State, Req1);
-        {Token, Req1} ->
-            {State#state{token = {token, Token}}, Req1}
-    end;
-
 get_token(State, Req) ->
     get_header(State, Req).
-
-%% We only allow basic auth in the V1 API
-get_header(State = #state{version = ?V1}, Req) ->
-    {ok, Auth, Req1} = cowboy_req:parse_header(<<"authorization">>, Req),
-    case Auth of
-        {<<"basic">>, {Username, Password}} ->
-            case libsnarl:auth(Username, Password) of
-                {ok, UUID} ->
-                    {State#state{token = UUID}, Req1};
-                _ ->
-                    {State, Req1}
-            end;
-        {<<"bearer">>, Bearer} ->
-            State1 = resolve_bearer(State#state{bearer = Bearer}),
-            {State1, Req1};
-        _ ->
-            get_qs(State, Req1)
-    end;
 
 get_header(State, Req) ->
     case cowboy_oauth:get_token(Req) of
@@ -147,14 +109,6 @@ get_qs(State, Req) ->
             end
     end.
 
-%% We only use cookies in the V1 API
-get_cookie(State = #state{version = ?V1}, Req) ->
-    case cowboy_req:cookie(<<"x-snarl-token">>, Req) of
-        {undefined, Req1} ->
-            {State, Req1};
-        {Token, Req1} ->
-            {State#state{token = {token, Token}}, Req1}
-    end;
 get_cookie(State, Req) ->
     {State, Req}.
 

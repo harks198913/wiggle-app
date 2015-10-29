@@ -36,40 +36,25 @@ allowed_methods(_V, _Token, [?UUID(_User), <<"tokens">>]) ->
 allowed_methods(_V, _Token, [?UUID(_User), <<"tokens">>, _TokenID]) ->
     [<<"DELETE">>];
 
-allowed_methods(?V1, _Token, [?UUID(_User), <<"keys">>]) ->
-    [<<"GET">>, <<"PUT">>];
-
 allowed_methods(_V, _Token, [?UUID(_User), <<"keys">>]) ->
     [<<"PUT">>];
 
 allowed_methods(_Version, _Token, [?UUID(_User), <<"keys">>, _]) ->
     [<<"DELETE">>];
 
-allowed_methods(?V1, _Token, [?UUID(_User), <<"yubikeys">>]) ->
-    [<<"GET">>, <<"PUT">>];
-
 allowed_methods(_V, _Token, [?UUID(_User), <<"yubikeys">>]) ->
     [<<"PUT">>];
 
-allowed_methods(_Version, _Token, [?UUID(_User), <<"yubikeys">>, _]) ->
+allowed_methods(_V, _Token, [?UUID(_User), <<"yubikeys">>, _]) ->
     [<<"DELETE">>];
 
-allowed_methods(?V1, _Token, [?UUID(_User), <<"permissions">>]) ->
-    [<<"GET">>];
-
-allowed_methods(_, _Token, [?UUID(_User), <<"permissions">> | _Permission]) ->
+allowed_methods(_V, _Token, [?UUID(_User), <<"permissions">> | _Permission]) ->
     [<<"PUT">>, <<"DELETE">>, <<"GET">>];
 
-allowed_methods(?V1, _Token, [?UUID(_User), <<"roles">>]) ->
-    [<<"GET">>];
-
-allowed_methods(_, _Token, [?UUID(_User), <<"roles">>, _Role]) ->
+allowed_methods(_V, _Token, [?UUID(_User), <<"roles">>, _Role]) ->
     [<<"PUT">>, <<"DELETE">>];
 
-allowed_methods(?V1, _Token, [?UUID(_User), <<"orgs">>]) ->
-    [<<"GET">>];
-
-allowed_methods(_Version, _Token, [?UUID(_User), <<"orgs">>, _Org]) ->
+allowed_methods(_V, _Token, [?UUID(_User), <<"orgs">>, _Org]) ->
     [<<"PUT">>, <<"DELETE">>].
 
 
@@ -188,9 +173,6 @@ permission_required(#state{method = <<"DELETE">>,
                            path = [?UUID(User), <<"permissions">> | Permission]}) ->
     {multiple, [[<<"users">>, User, <<"revoke">>], Permission]};
 
-permission_required(#state{version = ?V1, method = <<"GET">>,
-                           path = [?UUID(User), <<"roles">>]}) ->
-    {ok, [<<"users">>, User, <<"get">>]};
 
 permission_required(#state{method = <<"PUT">>,
                            path = [?UUID(User), <<"roles">>, Role]}) ->
@@ -201,10 +183,6 @@ permission_required(#state{method = <<"DELETE">>,
                            path = [?UUID(User), <<"roles">>, Role]}) ->
     {multiple, [[<<"users">>, User, <<"leave">>],
                 [<<"roles">>, Role, <<"leave">>]]};
-
-permission_required(#state{version = ?V1, method = <<"GET">>,
-                           path = [?UUID(User), <<"orgs">>]}) ->
-    {ok, [<<"users">>, User, <<"get">>]};
 
 permission_required(#state{method = <<"PUT">>,
                            path = [?UUID(User), <<"orgs">>, Org]}) ->
@@ -224,10 +202,6 @@ permission_required(#state{method = <<"DELETE">>,
                            path = [?UUID(User), <<"metadata">> | _]}) ->
     {ok, [<<"users">>, User, <<"edit">>]};
 
-permission_required(#state{version = ?V1, method = <<"GET">>,
-                           path = [?UUID(User), <<"keys">>]}) ->
-    {ok, [<<"users">>, User, <<"get">>]};
-
 permission_required(#state{method = <<"PUT">>,
                            path = [?UUID(User), <<"keys">>]}) ->
     {ok, [<<"users">>, User, <<"edit">>]};
@@ -235,10 +209,6 @@ permission_required(#state{method = <<"PUT">>,
 permission_required(#state{method = <<"DELETE">>,
                            path = [?UUID(User), <<"keys">>, _KeyID]}) ->
     {ok, [<<"users">>, User, <<"edit">>]};
-
-permission_required(#state{version = ?V1, method = <<"GET">>,
-                           path = [?UUID(User), <<"yubikeys">>]}) ->
-    {ok, [<<"users">>, User, <<"get">>]};
 
 permission_required(#state{method = <<"PUT">>,
                            path = [?UUID(User), <<"yubikeys">>]}) ->
@@ -286,10 +256,6 @@ read(Req, State = #state{path = [_User], obj = UserObj}) ->
     UserObj2 = to_json(UserObj),
     {UserObj2, Req, State};
 
-read(Req, State = #state{version = ?V1,
-                         path = [_User, <<"permissions">>], obj = UserObj}) ->
-    {ft_user:permissions(UserObj), Req, State};
-
 read(Req, State = #state{path = [User, <<"permissions">> | Permission]}) ->
     case wiggle_h:get_permissions(User) of
         not_found ->
@@ -302,23 +268,7 @@ read(Req, State = #state{path = [User, <<"permissions">> | Permission]}) ->
                 false ->
                     {[{<<"error">>, <<"forbidden">>}], Req, State}
             end
-    end;
-
-read(Req, State = #state{version = ?V1, obj = UserObj,
-                         path = [_User, <<"roles">>]}) ->
-    {ft_user:roles(UserObj), Req, State};
-
-read(Req, State = #state{version = ?V1, obj = UserObj,
-                         path = [_User, <<"orgs">>]}) ->
-    {ft_user:orgs(UserObj), Req, State};
-
-read(Req, State = #state{version = ?V1, obj = UserObj,
-                         path = [_User, <<"keys">>]}) ->
-    {ft_user:keys(UserObj), Req, State};
-
-read(Req, State = #state{version = ?V1, obj = UserObj,
-                         path = [_User, <<"yubikeys">>]}) ->
-    {ft_user:yubikeys(UserObj), Req, State}.
+    end.
 
 %%--------------------------------------------------------------------
 %% POST
