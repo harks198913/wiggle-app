@@ -96,7 +96,7 @@ permission_required(#state{method = <<"PUT">>,
     {ok, [<<"groupings">>, Grouping, <<"edit">>]};
 
 permission_required(#state{method = <<"DELETE">>,
-                           path = [?UUID(Grouping), <<"confing">> | _]}) ->
+                           path = [?UUID(Grouping), <<"config">> | _]}) ->
     {ok, [<<"groupings">>, Grouping, <<"edit">>]};
 
 permission_required(_State) ->
