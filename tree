@@ -15,9 +15,10 @@
    │  ├─ poolboy─1.5.1
    │  └─ qdate─0.3.0-pre
    │     ├─ erlang_localtime─1.0
-   │     └─ erlware_commons─0.16.0
+   │     └─ erlware_commons─0.16.1
+   │        └─ cf─0.2.1
    ├─ e2qc─1.0
-   ├─ fifo_dt─0.1.55
+   ├─ fifo_dt─0.1.56
    │  ├─ libsnarlmatch─0.1.7
    │  └─ riak_dt─2.1.1
    ├─ fifo_s3─0.1.13
