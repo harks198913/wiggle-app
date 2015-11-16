@@ -57,7 +57,6 @@ start(_StartType, _StartArgs) ->
                     ok
             end,
             R = wiggle_sup:start_link(),
-            lager_watchdog_srv:set_version(?VERSION),
             wiggle_snmp_h:start(),
             R;
         _ ->
