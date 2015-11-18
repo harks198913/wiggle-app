@@ -79,9 +79,13 @@ read(Req, State = #state{path = []}) ->
       {metrics,  Metrics3},
       {warnings, Warnings3}], Req, State}.
 
-create(Res, _, _) ->
-    {stop, Res}.
-delete(Res, _) ->
-    {stop, Res}.
-write(Res, _, _) ->
-    {stop, Res}.
+create(Req, State, _) ->
+    not_supportred(Req, State).
+delete(Req, State) ->
+    not_supportred(Req, State).
+write(Req, State, _) ->
+    not_supportred(Req, State).
+
+not_supportred(Req, State) ->
+    {ok, Req1} = cowboy_req:reply(400, [], <<"not supported">>, Req),
+    {halt, Req1, State}.

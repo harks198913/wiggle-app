@@ -12,18 +12,10 @@ then
         exit 0
 fi
 
-make quick-xref
+make pre-commit
 RETVAL=$?
 if [ $RETVAL -ne 0 ]
 then
-  echo "XRef failed."
-  exit 1
-fi
-
-make quick-test
-RETVAL=$?
-if [ $RETVAL -ne 0 ]
-then
-  echo "Test failed."
+  echo "checks failed."
   exit 1
 fi
