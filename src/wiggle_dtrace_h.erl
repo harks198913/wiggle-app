@@ -7,7 +7,7 @@
 
 -export([allowed_methods/3,
          get/1,
-         permission_required/1,
+         permission_required/2,
          read/2,
          create/3,
          write/3,
@@ -40,35 +40,36 @@ get(State = #state{path = [?UUID(Dtrace) | _]}) ->
 get(_State) ->
     not_found.
 
-permission_required(#state{method= <<"GET">>, path = []}) ->
+permission_required(get, []) ->
     {ok, [<<"cloud">>, <<"dtraces">>, <<"list">>]};
 
-permission_required(#state{method= <<"POST">>, path = []}) ->
+permission_required(post, []) ->
     {ok, [<<"cloud">>, <<"dtraces">>, <<"create">>]};
 
-permission_required(#state{method = <<"GET">>, path = [?UUID(Dtrace)]}) ->
+permission_required(get, [?UUID(Dtrace)]) ->
     {ok, [<<"dtraces">>, Dtrace, <<"get">>]};
 
-permission_required(#state{method = <<"DELETE">>, path = [?UUID(Dtrace)]}) ->
+permission_required(delete, [?UUID(Dtrace)]) ->
     {ok, [<<"dtraces">>, Dtrace, <<"delete">>]};
 
-permission_required(#state{method = <<"PUT">>, path = [?UUID(Dtrace)]}) ->
+permission_required(put, [?UUID(Dtrace)]) ->
     {ok, [<<"dtraces">>, Dtrace, <<"edit">>]};
 
-permission_required(#state{method = <<"PUT">>, path = [?UUID(Dtrace), <<"metadata">> | _]}) ->
+permission_required(put, [?UUID(Dtrace), <<"metadata">> | _]) ->
     {ok, [<<"dtraces">>, Dtrace, <<"edit">>]};
 
-permission_required(#state{method = <<"DELETE">>, path = [?UUID(Dtrace), <<"metadata">> | _]}) ->
+permission_required(delete, [?UUID(Dtrace), <<"metadata">> | _]) ->
     {ok, [<<"dtraces">>, Dtrace, <<"edit">>]};
 
-permission_required(_State) ->
+permission_required(_Method, _Path) ->
     undefined.
 
 %%--------------------------------------------------------------------
 %% GET
 %%--------------------------------------------------------------------
 
-read(Req, State = #state{token = Token, path = [], full_list=FullList, full_list_fields=Filter}) ->
+read(Req, State = #state{token = Token, path = [], full_list=FullList,
+                         full_list_fields=Filter}) ->
     Start = erlang:system_time(micro_seconds),
     {ok, Permissions} = wiggle_h:get_permissions(Token),
     ?MSnarl(?P(State), Start),
@@ -112,7 +113,8 @@ create(Req, State = #state{path = [], version = Version}, Data) ->
                 _ ->
                     ok
             end,
-            {{true, <<"/api/", Version/binary, "/dtrace/", UUID/binary>>}, Req, State#state{body = Data}};
+            {{true, <<"/api/", Version/binary, "/dtrace/", UUID/binary>>}, Req,
+             State#state{body = Data}};
         duplicate ->
             {ok, Req1} = cowboy_req:reply(409, Req),
             {halt, Req1, State}
@@ -122,7 +124,8 @@ create(Req, State = #state{path = [], version = Version}, Data) ->
 write(Req, State = #state{method = <<"POST">>, path = []}, _) ->
     {true, Req, State};
 
-write(Req, State = #state{path = [?UUID(Dtrace), <<"metadata">> | Path]}, [{K, V}]) ->
+write(Req, State = #state{path = [?UUID(Dtrace), <<"metadata">> | Path]},
+      [{K, V}]) ->
     Start = erlang:system_time(micro_seconds),
     ok = ls_dtrace:set_metadata(Dtrace, [{Path ++ [K], jsxd:from_list(V)}]),
     e2qc:evict(?CACHE, Dtrace),

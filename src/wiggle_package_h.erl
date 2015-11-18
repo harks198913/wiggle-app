@@ -10,7 +10,7 @@
 
 -export([allowed_methods/3,
          get/1,
-         permission_required/1,
+         permission_required/2,
          read/2,
          create/3,
          write/3,
@@ -44,28 +44,28 @@ get(State = #state{path = [?UUID(Package) | _]}) ->
 get(_) ->
     not_found.
 
-permission_required(#state{method= <<"GET">>, path = []}) ->
+permission_required(get, []) ->
     {ok, [<<"cloud">>, <<"packages">>, <<"list">>]};
 
-permission_required(#state{method= <<"POST">>, path = []}) ->
+permission_required(post, []) ->
     {ok, [<<"cloud">>, <<"packages">>, <<"create">>]};
 
-permission_required(#state{method = <<"GET">>, path = [?UUID(Package)]}) ->
+permission_required(get, [?UUID(Package)]) ->
     {ok, [<<"packages">>, Package, <<"get">>]};
 
-permission_required(#state{method = <<"DELETE">>, path = [?UUID(Package)]}) ->
+permission_required(delete, [?UUID(Package)]) ->
     {ok, [<<"packages">>, Package, <<"delete">>]};
 
-permission_required(#state{method = <<"PUT">>, path = [?UUID(_Package)]}) ->
+permission_required(put, [?UUID(_Package)]) ->
     {ok, [<<"cloud">>, <<"packages">>, <<"create">>]};
 
-permission_required(#state{method = <<"PUT">>, path = [?UUID(Package), <<"metadata">> | _]}) ->
+permission_required(put, [?UUID(Package), <<"metadata">> | _]) ->
     {ok, [<<"packages">>, Package, <<"edit">>]};
 
-permission_required(#state{method = <<"DELETE">>, path = [?UUID(Package), <<"metadata">> | _]}) ->
+permission_required(delete, [?UUID(Package), <<"metadata">> | _]) ->
     {ok, [<<"packages">>, Package, <<"edit">>]};
 
-permission_required(_State) ->
+permission_required(_Method, _Path) ->
     undefined.
 
 %%--------------------------------------------------------------------
@@ -83,7 +83,8 @@ schema(_State) ->
 %% GET
 %%--------------------------------------------------------------------
 
-read(Req, State = #state{token = Token, path = [], full_list=FullList, full_list_fields=Filter}) ->
+read(Req, State = #state{token = Token, path = [], full_list=FullList,
+                         full_list_fields=Filter}) ->
     Start = erlang:system_time(micro_seconds),
     {ok, Permissions} = wiggle_h:get_permissions(Token),
     ?MSnarl(?P(State), Start),
@@ -125,7 +126,8 @@ create(Req, State = #state{path = [], version = Version}, Data) ->
              || {R, V} <- jsxd:get(<<"org">>, [], Data)],
             e2qc:teardown(?LIST_CACHE),
             e2qc:teardown(?FULL_CACHE),
-            {{true, <<"/api/", Version/binary, "/packages/", UUID/binary>>}, Req, State#state{body = Data}};
+            {{true, <<"/api/", Version/binary, "/packages/", UUID/binary>>},
+             Req, State#state{body = Data}};
         duplicate ->
             {ok, Req1} = cowboy_req:reply(409, Req),
             {halt, Req1, State}
@@ -136,7 +138,8 @@ create(Req, State = #state{path = [], version = Version}, Data) ->
 write(Req, State = #state{method = <<"POST">>, path = []}, _) ->
     {true, Req, State};
 
-write(Req, State = #state{path = [?UUID(Package), <<"metadata">> | Path]}, [{K, V}]) ->
+write(Req, State = #state{path = [?UUID(Package), <<"metadata">> | Path]},
+      [{K, V}]) ->
     ok = ls_package:set_metadata(Package, [{Path ++ [K], jsxd:from_list(V)}]),
     e2qc:evict(?CACHE, Package),
     e2qc:teardown(?FULL_CACHE),

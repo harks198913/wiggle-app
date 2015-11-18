@@ -1,13 +1,14 @@
 -record(state, {
           %% The callback module responsible for the REST interactions
-          module,
+          module :: module(),
           %% The path of the reqest
-          path,
-          %% The method of the request
-          method,
+          path :: wiggle_h:path(),
+          %% The method of the request, as binary and atom
+          method :: binary(),
+          method_a :: wiggle_h:method(),
           %% The API version
-          version,
-          version_i,
+          version :: binary(),
+          version_i :: pos_integer(),
           %% The token (either {token, ...} or user uuid)
           token,
           %% The object the reuqest is asking for (from the DB)
@@ -17,7 +18,7 @@
           %% When the request was started.
           start,
           %% The whole path as a binary
-          path_bin,
+          path_bin :: binary(),
           %% The ETAG when generated
           etag,
           %% The bearer token when OAuth is used
@@ -27,11 +28,11 @@
           %% The permissions granted by the OAuth2 scope.
           %% If we don't have a scope aka don't use oatuh2 we always allow
           %% everything from a scope pov.
-          scope_perms = [[<<"...">>]],
+          scope_perms = [[<<"...">>]] :: [wiggle_h:permission()],
           %% Te full list header
-          full_list = false,
+          full_list = false :: boolean(),
           %% The full list fields
-          full_list_fields=[]
+          full_list_fields = [] :: [binary()]
          }).
 
 -define(P(State), State#state.path_bin).

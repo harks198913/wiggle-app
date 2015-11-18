@@ -51,15 +51,29 @@
 
 -type handler_state() :: #state{}.
 
+-type permission_reply() :: undefined |
+                            {ok, wiggle_h:permission()} |
+                            {ok, always} |
+                            {multiple, [wiggle_h:permission()]} |
+                            {error, needs_decode}.
+
+
 -callback allowed_methods(Version :: binary(), Token :: binary(),
-                          Path :: [binary()]) ->
+                          Path :: wiggle_h:path()) ->
     [binary()].
 
 -callback get(handler_state()) ->
     not_found | {ok, term()}.
 
 -callback permission_required(handler_state()) ->
-    {ok, [binary()] | always} | undefined.
+    permission_reply().
+
+-callback permission_required(wiggle_h:method(), wiggle_h:path()) ->
+    permission_reply().
+
+-callback permission_required(wiggle_h:method(), wiggle_h:path(),
+                              handler_state()) ->
+    permission_reply().
 
 -callback read(Req :: term(), handler_state()) ->
     {term(), Req :: term(), handler_state()}.
@@ -72,8 +86,6 @@
 
 -callback delete(Req :: term(), handler_state()) ->
     {term(), Req :: term(), handler_state()}.
-
-
 
 -callback service_available(handler_state()) ->
     true | false.
@@ -94,7 +106,9 @@
 
 
 -optional_callbacks([service_available/1, schema/1, authorization_required/1,
-                     content_types_provided/1, content_types_accepted/1]).
+                     content_types_provided/1, content_types_accepted/1,
+                     permission_required/3, permission_required/2,
+                     permission_required/1]).
 
 init(_Transport, _Req, _) ->
     {upgrade, protocol, cowboy_rest}.
@@ -119,7 +133,7 @@ options(Req, State = #state{module = M}) ->
     Methods = M:allowed_methods(State#state.version,
                                 State#state.token,
                                 State#state.path),
-    wiggle_h:options(Req, State,Methods).
+    wiggle_h:options(Req, State, Methods).
 
 
 content_types_provided(Req, State = #state{module = M}) ->
@@ -160,7 +174,8 @@ resource_exists(Req, State = #state{module = M}) ->
 generate_etag(Req, State = #state{obj = undefined}) ->
     {undefined, Req, State};
 generate_etag(Req, State = #state{obj = Obj}) ->
-    {{strong, base64:encode(crypto:hash(md5, term_to_binary(Obj)))}, Req, State}.
+    {{strong, base64:encode(crypto:hash(md5, term_to_binary(Obj)))},
+     Req, State}.
 
 is_authorized(Req, State = #state{method = <<"OPTIONS">>}) ->
     {true, Req, State};
@@ -194,8 +209,20 @@ forbidden(Req, State = #state{token = undefined, module = M}) ->
         end,
     {F(State), Req, State};
 
-forbidden(Req, State = #state{module = M}) ->
-    case M:permission_required(State) of
+forbidden(Req, State = #state{method_a = Method, path = Path, module = M}) ->
+    Reply = case {erlang:function_exported(M, permission_required, 3),
+                  erlang:function_exported(M, permission_required, 2),
+                  erlang:function_exported(M, permission_required, 1)} of
+                {true, _, _} ->
+                    M:permission_required(Method, Path, State);
+                {false, true, _} ->
+                    M:permission_required(Method, Path);
+                {false, false, true} ->
+                    M:permission_required(State);
+                _ ->
+                    undefined
+            end,
+    case Reply of
         {error, needs_decode} ->
             {ok, Decoded, Req1} = wiggle_h:decode(Req),
             forbidden(Req1, State#state{body = Decoded});
@@ -210,7 +237,8 @@ forbidden(Req, State = #state{module = M}) ->
                                     %% will always return false.
                                     false;
                                (Permission, Acc) ->
-                                    Acc andalso wiggle_h:allowed(State, Permission)
+                                    Acc andalso
+                                        wiggle_h:allowed(State, Permission)
                             end, true, Permissions),
             {not R, Req, State};
         {ok, Permission} ->

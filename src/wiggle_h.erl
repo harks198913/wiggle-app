@@ -18,8 +18,25 @@
          timeout_cache_with_invalid/6,
          timeout_cache/5,
          list/9,
-         allowed/2
+         allowed/2,
+         get_ws_token/1
         ]).
+
+
+-type permission() :: [binary()].
+-type path() :: [binary()].
+-type method() :: get |
+                  put |
+                  post |
+                  delete |
+                  update |
+                  trace |
+                  options |
+                  head |
+                  connect |
+                  undefined.
+
+-export_type([permission/0, method/0, path/0]).
 
 allowed(State=#state{scope_perms = SP}, Permission) ->
     Start = erlang:system_time(micro_seconds),
@@ -49,6 +66,7 @@ initial_state(Req) ->
                    _:_ ->
                        0
                end,
+    MethodA = method_to_atom(Method),
     {Path, Req2} = cowboy_req:path_info(Req1),
     {PathB, Req3} = cowboy_req:path(Req2),
     {FullList, Req4} = full_list(Req3),
@@ -57,6 +75,7 @@ initial_state(Req) ->
                 version = Version,
                 version_i = VersionI,
                 method = Method,
+                method_a = MethodA,
                 path = Path,
                 start = erlang:system_time(micro_seconds),
                 path_bin = PathB,
@@ -66,17 +85,36 @@ initial_state(Req) ->
     {State1, Req6} = get_token(State, Req5),
     {ok, set_access_header(Req6), State1}.
 
+method_to_atom(<<"GET">>) ->
+    get;
+method_to_atom(<<"PUT">>) ->
+    put;
+method_to_atom(<<"POST">>) ->
+    post;
+method_to_atom(<<"DELETE">>) ->
+    delete;
+method_to_atom(<<"UPDATE">>) ->
+    update;
+method_to_atom(<<"TRACE">>) ->
+    trace;
+method_to_atom(<<"OPTIONS">>) ->
+    options;
+method_to_atom(<<"HEAD">>) ->
+    head;
+method_to_atom(<<"CONNECT">>) ->
+    connect;
+method_to_atom(_) ->
+    undefined.
+
 set_access_header(Req) ->
     Req1 = cowboy_req:set_resp_header(
              <<"access-control-allow-origin">>, <<"*">>, Req),
     Req2 = cowboy_req:set_resp_header(
              <<"access-control-allow-headers">>,
-             <<"Authorization, content-type, x-full-list, x-full-list-fields">>, Req1),
-    Req3 = cowboy_req:set_resp_header(
-             <<"access-control-expose-headers">>,
-             <<"x-full-list, x-full-list-fields">>, Req2),
+             <<"Authorization, content-type">>,
+             Req1),
     cowboy_req:set_resp_header(
-      <<"access-control-allow-credentials">>, <<"true">>, Req3).
+      <<"access-control-allow-credentials">>, <<"true">>, Req2).
 
 get_token(State, Req) ->
     get_header(State, Req).
@@ -123,15 +161,6 @@ resolve_bearer(State = #state{bearer = Bearer}) ->
 
 full_list(Req) ->
     case cowboy_req:qs_val(<<"full-list">>, Req) of
-        {undefined, ReqY} ->
-            case cowboy_req:header(<<"x-full-list">>, ReqY) of
-                {<<"true">>, ReqX} ->
-                    {true, ReqX};
-                {<<"True">>, ReqX} ->
-                    {true, ReqX};
-                {_, ReqX} ->
-                    {false, ReqX}
-            end;
         {<<"true">>, ReqY} ->
             {true, ReqY};
         {<<"True">>, ReqY} ->
@@ -143,12 +172,7 @@ full_list(Req) ->
 full_list_fields(Req) ->
     case cowboy_req:qs_val(<<"full-list-fields">>, Req) of
         {undefined, ReqY} ->
-            case cowboy_req:header(<<"x-full-list-fields">>, ReqY) of
-                {undefined, ReqX} ->
-                    {[], ReqX};
-                {Fields, ReqX} ->
-                    {re:split(Fields, ","), ReqX}
-            end;
+            {[], ReqY};
         {Fields, ReqY} ->
             {re:split(Fields, ","), ReqY}
     end.
@@ -272,7 +296,8 @@ timeout_cache_with_invalid(Cache, Value, TTL1, TTL2, Invalid, Fun) ->
             R
     end.
 
-list(ListFn, ConvertFn, Token, Permission, FullList, Filter, TTLEntry, FullCache, ListCache) ->
+list(ListFn, ConvertFn, Token, Permission, FullList, Filter, TTLEntry,
+     FullCache, ListCache) ->
     Fun = list_fn(ListFn, ConvertFn, Permission, FullList, Filter),
     case application:get_env(wiggle, TTLEntry) of
         {ok, {TTL1, TTL2}} ->
@@ -297,4 +322,43 @@ list_fn(ListFn, ConvertFn, Permission, FullList, Filter) ->
                 _ ->
                     [jsxd:select(Filter, ConvertFn(Obj)) || {_, Obj} <- Res]
             end
+    end.
+
+%% Fuck you dialyzer, it refuses to accept that get_token can
+%% return stuff other then no_token ...
+%% -dialyzer({nowarn_function, [get_token/2]}).
+-spec get_ws_token(Req) ->
+                       {ok, binary(), [[binary()]], Req} |
+                       {denied, Req} |
+                       {no_token, Req}
+                           when Req :: cowboy_req:req().
+
+get_ws_token(Req) ->
+    case cowboy_req:qs_val(<<"fifo_ott">>, Req) of
+        {OTT, Req1} when is_binary(OTT) ->
+            case ls_token:get(OTT) of
+                {ok, Bearer} ->
+                    ls_token:delete(OTT),
+                    verify_bearer(Bearer, Req1);
+                _ ->
+                    {denied, Req1}
+            end;
+        {undefined, Req1} ->
+            {no_token, Req1}
+    end.
+
+verify_bearer(Bearer, Req)->
+    case ls_oauth:verify_access_token(Bearer) of
+        {ok, Context} ->
+            case {proplists:get_value(<<"resource_owner">>, Context),
+                  proplists:get_value(<<"scope">>, Context)} of
+                {undefined, _} ->
+                    {denied, Req};
+                {UUID, Scope} ->
+                    {ok, Scopes} = ls_oauth:scope(Scope),
+                    SPerms = cowboy_oauth:scope_perms(Scopes, []),
+                    {ok, UUID, SPerms, Req}
+            end;
+        _ ->
+            {denied, Req}
     end.

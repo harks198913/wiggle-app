@@ -10,7 +10,7 @@
 
 -export([allowed_methods/3,
          get/1,
-         permission_required/1,
+         permission_required/2,
          read/2,
          create/3,
          write/3,
@@ -52,61 +52,54 @@ get(State = #state{path = [?UUID(Grouping) | _]}) ->
 get(_State) ->
     not_found.
 
-permission_required(#state{method = <<"GET">>, path = []}) ->
+permission_required(get, []) ->
     {ok, [<<"cloud">>, <<"groupings">>, <<"list">>]};
 
-permission_required(#state{method = <<"POST">>, path = []}) ->
+permission_required(post, []) ->
     {ok, [<<"cloud">>, <<"groupings">>, <<"create">>]};
 
-permission_required(#state{method = <<"GET">>, path = [?UUID(Grouping)]}) ->
+permission_required(get, [?UUID(Grouping)]) ->
     {ok, [<<"groupings">>, Grouping, <<"get">>]};
 
-permission_required(#state{method = <<"DELETE">>, path = [?UUID(Grouping)]}) ->
+permission_required(delete, [?UUID(Grouping)]) ->
     {ok, [<<"groupings">>, Grouping, <<"delete">>]};
 
-permission_required(#state{method = <<"PUT">>, path = [?UUID(_Grouping)]}) ->
+permission_required(put, [?UUID(_Grouping)]) ->
     {ok, [<<"cloud">>, <<"groupings">>, <<"create">>]};
 
-permission_required(#state{method = <<"PUT">>,
-                           path = [?UUID(Grouping), <<"elements">>,  _]}) ->
+permission_required(put, [?UUID(Grouping), <<"elements">>,  _]) ->
     {ok, [<<"groupings">>, Grouping, <<"edit">>]};
 
-permission_required(#state{method = <<"DELETE">>,
-                           path = [?UUID(Grouping), <<"elements">>, _]}) ->
+permission_required(delete, [?UUID(Grouping), <<"elements">>, _]) ->
     {ok, [<<"groupings">>, Grouping, <<"edit">>]};
 
-permission_required(#state{method = <<"PUT">>,
-                           path = [?UUID(Grouping), <<"groupings">>,  _]}) ->
+permission_required(put, [?UUID(Grouping), <<"groupings">>,  _]) ->
     {ok, [<<"groupings">>, Grouping, <<"edit">>]};
 
-permission_required(#state{method = <<"DELETE">>,
-                           path = [?UUID(Grouping), <<"groupings">>, _]}) ->
+permission_required(delete, [?UUID(Grouping), <<"groupings">>, _]) ->
     {ok, [<<"groupings">>, Grouping, <<"edit">>]};
 
-permission_required(#state{method = <<"PUT">>,
-                           path = [?UUID(Grouping), <<"metadata">> | _]}) ->
+permission_required(put, [?UUID(Grouping), <<"metadata">> | _]) ->
     {ok, [<<"groupings">>, Grouping, <<"edit">>]};
 
-permission_required(#state{method = <<"DELETE">>,
-                           path = [?UUID(Grouping), <<"metadata">> | _]}) ->
+permission_required(delete, [?UUID(Grouping), <<"metadata">> | _]) ->
     {ok, [<<"groupings">>, Grouping, <<"edit">>]};
 
-permission_required(#state{method = <<"PUT">>,
-                           path = [?UUID(Grouping), <<"config">> | _]}) ->
+permission_required(pot, [?UUID(Grouping), <<"config">> | _]) ->
     {ok, [<<"groupings">>, Grouping, <<"edit">>]};
 
-permission_required(#state{method = <<"DELETE">>,
-                           path = [?UUID(Grouping), <<"config">> | _]}) ->
+permission_required(delete, [?UUID(Grouping), <<"config">> | _]) ->
     {ok, [<<"groupings">>, Grouping, <<"edit">>]};
 
-permission_required(_State) ->
+permission_required(_Method, _Path) ->
     undefined.
 
 %%--------------------------------------------------------------------
 %% GET
 %%--------------------------------------------------------------------
 
-read(Req, State = #state{token = Token, path = [], full_list=FullList, full_list_fields=Filter}) ->
+read(Req, State = #state{token = Token, path = [], full_list=FullList,
+                         full_list_fields=Filter}) ->
     Start = erlang:system_time(micro_seconds),
     {ok, Permissions} = wiggle_h:get_permissions(Token),
     ?MSnarl(?P(State), Start),
@@ -151,15 +144,16 @@ create(Req, State = #state{path = [], version = Version, token=Token},
                     ok
             end,
             ?MSniffle(?P(State), Start),
-            {{true, <<"/api/", Version/binary, "/groupings/", UUID/binary>>}, Req, State#state{body = Data}};
+            {{true, <<"/api/", Version/binary, "/groupings/", UUID/binary>>},
+             Req, State#state{body = Data}};
         duplicate ->
             ?MSniffle(?P(State), Start),
             {ok, Req1} = cowboy_req:reply(409, Req),
             {halt, Req1, State}
     end.
 
-write(Req, State = #state{
-                      path = [?UUID(Grouping), <<"elements">>, IPrange]}, _Data) ->
+write(Req, State = #state{path = [?UUID(Grouping), <<"elements">>, IPrange]},
+      _Data) ->
     Start = erlang:system_time(micro_seconds),
     case ls_grouping:add_element(Grouping, IPrange) of
         ok ->
@@ -172,8 +166,8 @@ write(Req, State = #state{
             {false, Req, State}
     end;
 
-write(Req, State = #state{
-                      path = [?UUID(Grouping), <<"groupings">>, IPrange]}, _Data) ->
+write(Req, State = #state{path = [?UUID(Grouping), <<"groupings">>, IPrange]},
+      _Data) ->
     Start = erlang:system_time(micro_seconds),
     case ls_grouping:add_grouping(Grouping, IPrange) of
         ok ->
@@ -189,7 +183,8 @@ write(Req, State = #state{
 write(Req, State = #state{method = <<"POST">>, path = []}, _) ->
     {true, Req, State};
 
-write(Req, State = #state{path = [?UUID(Grouping), <<"metadata">> | Path]}, [{K, V}]) ->
+write(Req, State = #state{path = [?UUID(Grouping), <<"metadata">> | Path]},
+      [{K, V}]) ->
     Start = erlang:system_time(micro_seconds),
     ok = ls_grouping:set_metadata(Grouping, [{Path ++ [K], jsxd:from_list(V)}]),
     e2qc:evict(?CACHE, Grouping),
@@ -197,7 +192,8 @@ write(Req, State = #state{path = [?UUID(Grouping), <<"metadata">> | Path]}, [{K,
     ?MSniffle(?P(State), Start),
     {true, Req, State};
 
-write(Req, State = #state{path = [?UUID(Grouping), <<"config">> | Path]}, [{K, V}]) ->
+write(Req, State = #state{path = [?UUID(Grouping), <<"config">> | Path]},
+      [{K, V}]) ->
     Start = erlang:system_time(micro_seconds),
     ok = ls_grouping:set_config(Grouping, [{Path ++ [K], jsxd:from_list(V)}]),
     e2qc:evict(?CACHE, Grouping),
@@ -228,7 +224,8 @@ delete(Req, State = #state{path = [?UUID(Grouping), <<"config">> | Path]}) ->
     ?MSniffle(?P(State), Start),
     {true, Req, State};
 
-delete(Req, State = #state{path = [?UUID(Grouping), <<"elements">>, Element]}) ->
+delete(Req,
+       State = #state{path = [?UUID(Grouping), <<"elements">>, Element]}) ->
     Start = erlang:system_time(micro_seconds),
     ok = ls_grouping:remove_element(Grouping, Element),
     e2qc:evict(?CACHE, Grouping),
@@ -236,7 +233,8 @@ delete(Req, State = #state{path = [?UUID(Grouping), <<"elements">>, Element]}) -
     ?MSniffle(?P(State), Start),
     {true, Req, State};
 
-delete(Req, State = #state{path = [?UUID(Grouping), <<"groupings">>, Element]}) ->
+delete(Req,
+       State = #state{path = [?UUID(Grouping), <<"groupings">>, Element]}) ->
     Start = erlang:system_time(micro_seconds),
     ok = ls_grouping:remove_grouping(Grouping, Element),
     e2qc:evict(?CACHE, Grouping),

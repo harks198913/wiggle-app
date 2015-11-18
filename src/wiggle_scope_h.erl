@@ -64,5 +64,5 @@ to_json(Scopes) ->
     [[{<<"default">>, Default},
       {<<"description">>, Desc},
       {<<"scope">>, Scope}]
-     || #{scope := Scope, desc := Desc, default := Default} 
+     || #{scope := Scope, desc := Desc, default := Default}
             <- Scopes].
