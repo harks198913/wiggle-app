@@ -10,7 +10,7 @@
 
 -export([allowed_methods/3,
          get/1,
-         permission_required/1,
+         permission_required/2,
          read/2,
          create/3,
          write/3,
@@ -46,45 +46,42 @@ get(State = #state{path = [?UUID(Network) | _]}) ->
 get(_State) ->
     not_found.
 
-permission_required(#state{method = <<"GET">>, path = []}) ->
+permission_required(get, []) ->
     {ok, [<<"cloud">>, <<"networks">>, <<"list">>]};
 
-permission_required(#state{method = <<"POST">>, path = []}) ->
+permission_required(post, []) ->
     {ok, [<<"cloud">>, <<"networks">>, <<"create">>]};
 
-permission_required(#state{method = <<"GET">>, path = [?UUID(Network)]}) ->
+permission_required(get, [?UUID(Network)]) ->
     {ok, [<<"networks">>, Network, <<"get">>]};
 
-permission_required(#state{method = <<"DELETE">>, path = [?UUID(Network)]}) ->
+permission_required(delete, [?UUID(Network)]) ->
     {ok, [<<"networks">>, Network, <<"delete">>]};
 
-permission_required(#state{method = <<"PUT">>, path = [?UUID(_Network)]}) ->
+permission_required(put, [?UUID(_Network)]) ->
     {ok, [<<"cloud">>, <<"networks">>, <<"create">>]};
 
-permission_required(#state{method = <<"PUT">>,
-                           path = [?UUID(Network), <<"ipranges">>,  _]}) ->
+permission_required(put, [?UUID(Network), <<"ipranges">>,  _]) ->
     {ok, [<<"networks">>, Network, <<"edit">>]};
 
-permission_required(#state{method = <<"DELETE">>,
-                           path = [?UUID(Network), <<"ipranges">>, _]}) ->
+permission_required(delete, [?UUID(Network), <<"ipranges">>, _]) ->
     {ok, [<<"networks">>, Network, <<"edit">>]};
 
-permission_required(#state{method = <<"PUT">>,
-                           path = [?UUID(Network), <<"metadata">> | _]}) ->
+permission_required(put, [?UUID(Network), <<"metadata">> | _]) ->
     {ok, [<<"networks">>, Network, <<"edit">>]};
 
-permission_required(#state{method = <<"DELETE">>,
-                           path = [?UUID(Network), <<"metadata">> | _]}) ->
+permission_required(delete, [?UUID(Network), <<"metadata">> | _]) ->
     {ok, [<<"networks">>, Network, <<"edit">>]};
 
-permission_required(_State) ->
+permission_required(_Method, _Path) ->
     undefined.
 
 %%--------------------------------------------------------------------
 %% GET
 %%--------------------------------------------------------------------
 
-read(Req, State = #state{token = Token, path = [], full_list=FullList, full_list_fields=Filter}) ->
+read(Req, State = #state{token = Token, path = [], full_list=FullList,
+                         full_list_fields=Filter}) ->
     Start = erlang:system_time(micro_seconds),
     {ok, Permissions} = wiggle_h:get_permissions(Token),
     ?MSnarl(?P(State), Start),
@@ -114,15 +111,16 @@ create(Req, State = #state{path = [], version = Version}, Data) ->
             ?MSniffle(?P(State), Start),
             e2qc:teardown(?LIST_CACHE),
             e2qc:teardown(?FULL_CACHE),
-            {{true, <<"/api/", Version/binary, "/networks/", UUID/binary>>}, Req, State#state{body = Data}};
+            {{true, <<"/api/", Version/binary, "/networks/", UUID/binary>>},
+             Req, State#state{body = Data}};
         duplicate ->
             ?MSniffle(?P(State), Start),
             {ok, Req1} = cowboy_req:reply(409, Req),
             {halt, Req1, State}
     end.
 
-write(Req, State = #state{
-                      path = [?UUID(Network), <<"ipranges">>, IPrange]}, _Data) ->
+write(Req, State = #state{path = [?UUID(Network), <<"ipranges">>, IPrange]},
+      _Data) ->
     Start = erlang:system_time(micro_seconds),
     case ls_network:add_iprange(Network, IPrange) of
         ok ->
@@ -138,7 +136,8 @@ write(Req, State = #state{
 write(Req, State = #state{method = <<"POST">>, path = []}, _) ->
     {true, Req, State};
 
-write(Req, State = #state{path = [?UUID(Network), <<"metadata">> | Path]}, [{K, V}]) ->
+write(Req, State = #state{path = [?UUID(Network), <<"metadata">> | Path]},
+      [{K, V}]) ->
     Start = erlang:system_time(micro_seconds),
     ok = ls_network:set_metadata(Network, [{Path ++ [K], jsxd:from_list(V)}]),
     e2qc:evict(?CACHE, Network),

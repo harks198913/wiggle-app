@@ -8,7 +8,7 @@
 
 -export([allowed_methods/3,
          get/1,
-         permission_required/1,
+         permission_required/3,
          read/2,
          create/3,
          write/3,
@@ -31,7 +31,8 @@
                 {false, Req, State}
         end).
 service_available(#state{path = [?UUID(_Vm), <<"metrics">>| _]}) ->
-    wiggle_h:service_available() andalso application:get_env(dqe, backend) =/= undefined;
+    wiggle_h:service_available() andalso
+        application:get_env(dqe, backend) =/= undefined;
 service_available(_) ->
     wiggle_h:service_available().
 
@@ -163,56 +164,55 @@ get(_State) ->
     not_found.
 
 
-permission_required(#state{method = <<"PUT">>, path = [<<"dry_run">>]}) ->
+permission_required(put, [<<"dry_run">>], _) ->
     {ok, [<<"cloud">>, <<"vms">>, <<"create">>]};
 
-permission_required(#state{method = <<"GET">>, path = []}) ->
+permission_required(get, [], _) ->
     {ok, [<<"cloud">>, <<"vms">>, <<"list">>]};
 
-permission_required(#state{method = <<"POST">>, path = []}) ->
+permission_required(post, [], _) ->
     {ok, [<<"cloud">>, <<"vms">>, <<"create">>]};
 
-permission_required(#state{method = <<"GET">>, path = [?UUID(Vm)]}) ->
+permission_required(get, [?UUID(Vm)], _) ->
     {ok, [<<"vms">>, Vm, <<"get">>]};
 
-permission_required(#state{version = ?V2, method = <<"GET">>,
-                           path = [?UUID(Vm), <<"metrics">> | _]}) ->
+permission_required(get, [?UUID(Vm), <<"metrics">> | _], _) ->
     {ok, [<<"vms">>, Vm, <<"get">>]};
 
-permission_required(#state{method = <<"DELETE">>, path = [?UUID(Vm)]}) ->
+permission_required(delete, [?UUID(Vm)], _) ->
     {ok, [<<"vms">>, Vm, <<"delete">>]};
 
-permission_required(#state{method = <<"DELETE">>, path = [?UUID(Vm), <<"hypervisor">>]}) ->
+permission_required(delete, [?UUID(Vm), <<"hypervisor">>], _) ->
     {ok, [<<"vms">>, Vm, <<"delete">>]};
 
-permission_required(#state{method = <<"POST">>, path = [?UUID(Vm), <<"nics">>]}) ->
+permission_required(post, [?UUID(Vm), <<"nics">>], _) ->
     {ok, [<<"vms">>, Vm, <<"edit">>]};
 
-permission_required(#state{method = <<"PUT">>, path = [?UUID(Vm), <<"nics">>, _]}) ->
+permission_required(put, [?UUID(Vm), <<"nics">>, _], _) ->
     {ok, [<<"vms">>, Vm, <<"edit">>]};
 
-permission_required(#state{method = <<"DELETE">>, path = [?UUID(Vm), <<"nics">>, _]}) ->
+permission_required(delete, [?UUID(Vm), <<"nics">>, _], _) ->
     {ok, [<<"vms">>, Vm, <<"edit">>]};
 
-permission_required(#state{method = <<"POST">>, path = [?UUID(Vm), <<"snapshots">>]}) ->
+permission_required(post, [?UUID(Vm), <<"snapshots">>], _) ->
     {ok, [<<"vms">>, Vm, <<"snapshot">>]};
 
-permission_required(#state{method = <<"POST">>, path = [?UUID(Vm), <<"fw_rules">>]}) ->
+permission_required(post, [?UUID(Vm), <<"fw_rules">>], _) ->
     {ok, [<<"vms">>, Vm, <<"edit">>]};
 
-permission_required(#state{method = <<"DELETE">>, path = [?UUID(Vm), <<"fw_rules">>, _FWID]}) ->
+permission_required(delete, [?UUID(Vm), <<"fw_rules">>, _FWID], _) ->
     {ok, [<<"vms">>, Vm, <<"edit">>]};
 
-permission_required(#state{method = <<"PUT">>, path = [?UUID(Vm), <<"services">>]}) ->
+permission_required(put, [?UUID(Vm), <<"services">>], _) ->
     {ok, [<<"vms">>, Vm, <<"edit">>]};
 
-permission_required(#state{method = <<"POST">>, path = [?UUID(Vm), <<"backups">>]}) ->
+permission_required(post, [?UUID(Vm), <<"backups">>], _) ->
     {ok, [<<"vms">>, Vm, <<"backup">>]};
 
-permission_required(#state{method = <<"PUT">>, path = [?UUID(_Vm), <<"owner">>], body = undefiend}) ->
+permission_required(put, [?UUID(_Vm), <<"owner">>], #state{body = undefiend}) ->
     {error, needs_decode};
 
-permission_required(#state{method = <<"PUT">>, path = [?UUID(Vm), <<"owner">>], body = Decoded}) ->
+permission_required(put, [?UUID(Vm), <<"owner">>], #state{body = Decoded}) ->
     case Decoded of
         [{<<"org">>, Owner}] ->
             {multiple,
@@ -222,58 +222,52 @@ permission_required(#state{method = <<"PUT">>, path = [?UUID(Vm), <<"owner">>], 
             {ok, [<<"vms">>, Vm, <<"edit">>]}
     end;
 
-permission_required(#state{method = <<"PUT">>, body = undefiend}) ->
+permission_required(put, _, #state{body = undefiend}) ->
     {error, needs_decode};
 
-permission_required(#state{method = <<"PUT">>, body = undefined,
-                           version = ?V2, path = [?UUID(_Vm), <<"state">>]}) ->
+permission_required(put, [?UUID(_Vm), <<"state">>], #state{body = undefined}) ->
     {error, needs_decode};
 
-permission_required(#state{method = <<"PUT">>, body = [{<<"action">>, Act} | _],
-                           version = ?V2, path = [?UUID(Vm), <<"state">>]}) ->
+permission_required(put, [?UUID(Vm), <<"state">>],
+                    #state{body = [{<<"action">>, Act} | _]}) ->
     {ok, [<<"vms">>, Vm, Act]};
 
 
-permission_required(#state{method = <<"PUT">>, version = ?V2,
-                           path = [?UUID(Vm), <<"config">>]}) ->
+permission_required(put, [?UUID(Vm), <<"config">>], _ ) ->
     {ok, [<<"vms">>, Vm, <<"edit">>]};
 
-permission_required(#state{method = <<"PUT">>, version = ?V2,
-                           path = [?UUID(Vm), <<"package">>]}) ->
+permission_required(put, [?UUID(Vm), <<"package">>], _) ->
     {ok, [<<"vms">>, Vm, <<"edit">>]};
 
-permission_required(#state{method = <<"PUT">>, body = Decoded,
-                           path = [?UUID(Vm), <<"snapshots">>, _Snap]}) ->
-    case Decoded of
-        [{<<"action">>, <<"rollback">>}] ->
-            {ok, [<<"vms">>, Vm, <<"rollback">>]};
-        _ ->
-            {ok, [<<"vms">>, Vm, <<"edit">>]}
-    end;
+permission_required(put, [?UUID(Vm), <<"snapshots">>, _Snap],
+                    #state{body = [{<<"action">>, <<"rollback">>}]}) ->
+    {ok, [<<"vms">>, Vm, <<"rollback">>]};
 
-permission_required(#state{method = <<"DELETE">>, path = [?UUID(Vm), <<"snapshots">>, _Snap]}) ->
+permission_required(put, [?UUID(Vm), <<"snapshots">>, _Snap], _) ->
+    {ok, [<<"vms">>, Vm, <<"edit">>]};
+
+permission_required(delete, [?UUID(Vm), <<"snapshots">>, _Snap], _) ->
     {ok, [<<"vms">>, Vm, <<"snapshot_delete">>]};
 
-permission_required(#state{method = <<"PUT">>, body = Decoded,
-                           path = [?UUID(Vm), <<"backups">>, _Snap]}) ->
-    case Decoded of
-        [{<<"action">>, <<"rollback">>}|_] ->
-            {ok, [<<"vms">>, Vm, <<"rollback">>]};
-        _ ->
-            {ok, [<<"vms">>, Vm, <<"edit">>]}
-    end;
+permission_required(put, [?UUID(Vm), <<"backups">>, _Snap],
+                    #state{body =[{<<"action">>, <<"rollback">>}|_]}) ->
+    {ok, [<<"vms">>, Vm, <<"rollback">>]};
 
-permission_required(#state{method = <<"DELETE">>, path = [?UUID(Vm), <<"backups">>, _Snap]}) ->
+
+permission_required(put, [?UUID(Vm), <<"backups">>, _Snap], _) ->
+    {ok, [<<"vms">>, Vm, <<"edit">>]};
+
+
+permission_required(delete, [?UUID(Vm), <<"backups">>, _Snap], _) ->
     {ok, [<<"vms">>, Vm, <<"backup_delete">>]};
 
-permission_required(#state{method = <<"PUT">>,
-                           path = [?UUID(Vm), <<"metadata">> | _]}) ->
+permission_required(put, [?UUID(Vm), <<"metadata">> | _], _) ->
     {ok, [<<"vms">>, Vm, <<"edit">>]};
 
-permission_required(#state{method = <<"DELETE">>, path = [?UUID(Vm), <<"metadata">> | _]}) ->
+permission_required(delete, [?UUID(Vm), <<"metadata">> | _], _) ->
     {ok, [<<"vms">>, Vm, <<"edit">>]};
 
-permission_required(_State) ->
+permission_required(_Method, _Path, _State) ->
     undefined.
 
 
@@ -341,7 +335,8 @@ schema(_State) ->
 %% GET
 %%--------------------------------------------------------------------
 
-read(Req, State = #state{token = Token, path = [], full_list=FullList, full_list_fields=Filter}) ->
+read(Req, State = #state{token = Token, path = [], full_list=FullList,
+                         full_list_fields=Filter}) ->
     Start = erlang:system_time(micro_seconds),
     {ok, Permissions} = wiggle_h:get_permissions(Token),
     ?MSnarl(?P(State), Start),
@@ -365,16 +360,20 @@ read(Req, State = #state{path = [?UUID(Vm), <<"metrics">>]}) ->
         {ok, JSON} ->
             {JSON, Req1, State};
         {error, no_results} ->
-            {ok, Req2} = cowboy_req:reply(503, [], <<"Empty result set">>, Req1),
+            {ok, Req2} = cowboy_req:reply(
+                           503, [], <<"Empty result set">>, Req1),
             {halt, Req2, State};
         {error, no_server} ->
-            {ok, Req2} = cowboy_req:reply(503, [], <<"failed to connect to database">>, Req1),
+            {ok, Req2} = cowboy_req:reply(
+                           503, [], <<"failed to connect to database">>, Req1),
             {halt, Req2, State};
         {error, bad_qs} ->
-            {ok, Req2} = cowboy_req:reply(400, [], <<"bad qeruy string">>, Req1),
+            {ok, Req2} = cowboy_req:reply(
+                           400, [], <<"bad qeruy string">>, Req1),
             {halt, Req2, State};
         {error, bad_resolution} ->
-            {ok, Req2} = cowboy_req:reply(400, [], <<"bad resolution">>, Req1),
+            {ok, Req2} = cowboy_req:reply(
+                           400, [], <<"bad resolution">>, Req1),
             {halt, Req2, State}
     end.
 
@@ -384,7 +383,8 @@ read(Req, State = #state{path = [?UUID(Vm), <<"metrics">>]}) ->
 %% PUT
 %%--------------------------------------------------------------------
 
-create(Req, State = #state{path = [], version = Version, token = Token}, Decoded) ->
+create(Req, State = #state{path = [], version = Version, token = Token},
+       Decoded) ->
     {ok, Dataset} = jsxd:get(<<"dataset">>, Decoded),
     {ok, Package} = jsxd:get(<<"package">>, Decoded),
     {ok, Config} = jsxd:get(<<"config">>, Decoded),
@@ -401,11 +401,13 @@ create(Req, State = #state{path = [], version = Version, token = Token}, Decoded
               end,
     try
         Start = erlang:system_time(micro_seconds),
-        {ok, UUID} = ls_vm:create(Package, Dataset, jsxd:set(<<"owner">>, user(State), Config1)),
+        Config2 = jsxd:set(<<"owner">>, user(State), Config1),
+        {ok, UUID} = ls_vm:create(Package, Dataset, Config2),
         e2qc:teardown(?LIST_CACHE),
         e2qc:teardown(?FULL_CACHE),
         ?MSniffle(?P(State), Start),
-        {{true, <<"/api/", Version/binary, "/vms/", UUID/binary>>}, Req, State#state{body = Decoded}}
+        {{true, <<"/api/", Version/binary, "/vms/", UUID/binary>>},
+         Req, State#state{body = Decoded}}
     catch
         G:E ->
             lager:error("Error creating VM(~p): ~p / ~p", [Decoded, G, E]),
@@ -413,14 +415,16 @@ create(Req, State = #state{path = [], version = Version, token = Token}, Decoded
             {halt, Req1, State}
     end;
 
-create(Req, State = #state{path = [?UUID(Vm), <<"snapshots">>], version = Version}, Decoded) ->
+create(Req, State = #state{path = [?UUID(Vm), <<"snapshots">>],
+                           version = Version}, Decoded) ->
     Comment = jsxd:get(<<"comment">>, <<"">>, Decoded),
     Start = erlang:system_time(micro_seconds),
     {ok, _UUID} = ls_vm:snapshot(Vm, Comment),
     e2qc:evict(?CACHE, Vm),
     e2qc:teardown(?FULL_CACHE),
     ?MSniffle(?P(State), Start),
-    {{true, <<"/api/", Version/binary, "/vms/", Vm/binary>>}, Req, State#state{body = Decoded}};
+    {{true, <<"/api/", Version/binary, "/vms/", Vm/binary>>},
+     Req, State#state{body = Decoded}};
 
 create(Req, State = #state{path = [?UUID(Vm), <<"fw_rules">>],
                            version = Version}, RuleJSON) ->
@@ -430,9 +434,11 @@ create(Req, State = #state{path = [?UUID(Vm), <<"fw_rules">>],
     e2qc:evict(?CACHE, Vm),
     e2qc:teardown(?FULL_CACHE),
     ?MSniffle(?P(State), Start),
-    {{true, <<"/api/", Version/binary, "/vms/", Vm/binary>>}, Req, State#state{body = RuleJSON}};
+    {{true, <<"/api/", Version/binary, "/vms/", Vm/binary>>},
+     Req, State#state{body = RuleJSON}};
 
-create(Req, State = #state{path = [?UUID(Vm), <<"backups">>], version = Version}, Decoded) ->
+create(Req, State = #state{path = [?UUID(Vm), <<"backups">>],
+                          version = Version}, Decoded) ->
     Comment = jsxd:get(<<"comment">>, <<"">>, Decoded),
     Opts = [xml],
     Start = erlang:system_time(micro_seconds),
@@ -458,7 +464,8 @@ create(Req, State = #state{path = [?UUID(Vm), <<"backups">>], version = Version}
             {ok, _UUID} = ls_vm:full_backup(Vm, Comment, Opts1)
     end,
     ?MSniffle(?P(State), Start),
-    {{true, <<"/api/", Version/binary, "/vms/", Vm/binary>>}, Req, State#state{body = Decoded}};
+    {{true, <<"/api/", Version/binary, "/vms/", Vm/binary>>},
+     Req, State#state{body = Decoded}};
 
 
 create(Req, State = #state{path = [?UUID(Vm), <<"nics">>], version = Version},
@@ -469,14 +476,16 @@ create(Req, State = #state{path = [?UUID(Vm), <<"nics">>], version = Version},
             ?MSniffle(?P(State), Start),
             e2qc:evict(?CACHE, Vm),
             e2qc:teardown(?FULL_CACHE),
-            {{true, <<"/api/", Version/binary, "/vms/", Vm/binary>>}, Req, State};
+            {{true, <<"/api/", Version/binary, "/vms/", Vm/binary>>},
+             Req, State};
         {error, not_stopped} ->
             {ok, Req1} = cowboy_req:reply(412, [], <<"VM Running">>, Req),
             lager:error("Could not add nic, vm running."),
             {halt, Req1, State};
         E ->
             ?MSniffle(?P(State), Start),
-            lager:error("Error adding nic to VM(~p) on network(~p) / ~p", [?UUID(Vm), Network, E]),
+            lager:error("Error adding nic to VM(~p) on network(~p) / ~p",
+                        [?UUID(Vm), Network, E]),
             {ok, Req1} = cowboy_req:reply(500, Req),
             lager:error("Could not add nic: ~P"),
             {halt, Req1, State}
@@ -568,7 +577,8 @@ write(Req, State = #state{path = [?UUID(Vm), <<"services">>]},
 write(Req, State = #state{path = [_, <<"nics">>]}, _Body) ->
     {true, Req, State};
 
-write(Req, State = #state{path = [?UUID(Vm), <<"owner">>]}, [{<<"org">>, Org}]) ->
+write(Req, State = #state{path = [?UUID(Vm), <<"owner">>]},
+      [{<<"org">>, Org}]) ->
     Start = erlang:system_time(micro_seconds),
     case ls_org:get(Org) of
         {ok, _} ->
@@ -586,12 +596,14 @@ write(Req, State = #state{path = [?UUID(Vm), <<"owner">>]}, [{<<"org">>, Org}]) 
             {halt, Req1, State}
     end;
 
-write(Req, State = #state{path = [?UUID(Vm), <<"nics">>, Mac]}, [{<<"primary">>, true}]) ->
+write(Req, State = #state{path = [?UUID(Vm), <<"nics">>, Mac]},
+      [{<<"primary">>, true}]) ->
     e2qc:evict(?CACHE, Vm),
     e2qc:teardown(?FULL_CACHE),
     ?LIB(ls_vm:primary_nic(Vm, Mac));
 
-write(Req, State = #state{path = [?UUID(Vm), <<"metadata">> | Path]}, [{K, V}]) ->
+write(Req, State = #state{path = [?UUID(Vm), <<"metadata">> | Path]},
+      [{K, V}]) ->
     e2qc:evict(?CACHE, Vm),
     e2qc:teardown(?FULL_CACHE),
     ?LIB(ls_vm:set_metadata(Vm,  [{Path ++ [K],
@@ -748,7 +760,7 @@ delete(Req, State = #state{path = [?UUID(Vm)]}) ->
             e2qc:teardown(?FULL_CACHE),
             ?MSniffle(?P(State), Start),
             {true, Req, State};
-        {error,creating} ->
+        {error, creating} ->
             {ok, Req1} = cowboy_req:reply(423, Req),
             lager:error("Could not delete: locked"),
             {halt, Req1, State}
@@ -805,8 +817,8 @@ perf_mem(Zone) ->
      {"memory-value", mb([Zone, mem, value])}].
 
 perf_swap(Zone) ->
-    [{"memory-usage", mb([Zone, mem, usage])},
-     {"memory-value", mb([Zone, mem, value])}].
+    [{"swap-usage", mb([Zone, swap, usage])},
+     {"swap-value", mb([Zone, swap, value])}].
 
 perf_net(Zone, Nic) ->
     [{["net-send-ops-", Nic], der([Zone, net, Nic, opackets64])},

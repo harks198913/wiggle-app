@@ -24,10 +24,9 @@ start(_StartType, _StartArgs) ->
             {ok, Acceptors} = application:get_env(wiggle, acceptors),
             DPRules = dispatches(),
             Dispatch = cowboy_router:compile([{'_', DPRules}]),
-
-            {ok, _} = cowboy:start_http(http, Acceptors, [{port, Port}],
-                                        [{compress, Compression},
-                                         {env, [{dispatch, Dispatch}]}]),
+            Env = [{compress, Compression},
+                   {env, [{dispatch, Dispatch}]}],
+            {ok, _} = cowboy:start_http(http, Acceptors, [{port, Port}], Env),
             case application:get_env(wiggle, ssl) of
                 {ok, on} ->
                     {ok, SSLPort} = application:get_env(wiggle, ssl_port),
@@ -39,25 +38,11 @@ start(_StartType, _StartArgs) ->
                                                   {cacertfile, SSLCA},
                                                   {certfile, SSLCert},
                                                   {keyfile, SSLKey}],
-                                                 [{compress, Compression},
-                                                  {env, [{dispatch, Dispatch}]}]);
-                {ok, spdy} ->
-                    {ok, SSLPort} = application:get_env(wiggle, ssl_port),
-                    {ok, SSLCA} = application:get_env(wiggle, ssl_cacertfile),
-                    {ok, SSLCert} = application:get_env(wiggle, ssl_certfile),
-                    {ok, SSLKey} = application:get_env(wiggle, ssl_keyfile),
-                    {ok, _} = cowboy:start_spdy(spdy, Acceptors,
-                                                [{port, SSLPort},
-                                                 {cacertfile, SSLCA},
-                                                 {certfile, SSLCert},
-                                                 {keyfile, SSLKey}],
-                                                [{compress, Compression},
-                                                 {env, [{dispatch, Dispatch}]}]);
+                                                 Env);
                 _ ->
                     ok
             end,
             R = wiggle_sup:start_link(),
-            lager_watchdog_srv:set_version(?VERSION),
             wiggle_snmp_h:start(),
             R;
         _ ->
@@ -72,7 +57,7 @@ load_schemas() ->
     Schemas = filelib:fold_files(
                 code:priv_dir(wiggle), FileRegexp, true,
                 fun(File, Acc) ->
-                        io:format("Loading file: ~s~n", [File]),
+                        lager:info("[schema] Loading file: ~s~n", [File]),
                         BaseName = filename:basename(File),
                         Key = list_to_atom(filename:rootname(BaseName)),
                         {ok, Bin} = file:read_file(File),

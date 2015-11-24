@@ -11,7 +11,7 @@
 
 -export([allowed_methods/3,
          get/1,
-         permission_required/1,
+         permission_required/2,
          read/2,
          create/3,
          write/3,
@@ -95,7 +95,8 @@ get(State = #state{method = <<"DELETE">>,
             end
     end;
 
-get(State = #state{method = <<"PUT">>, path = [?UUID(User), <<"roles">>, Role]}) ->
+get(State = #state{method = <<"PUT">>,
+                   path = [?UUID(User), <<"roles">>, Role]}) ->
     case wiggle_user_h:get(State#state{path = [?UUID(User)]}) of
         not_found ->
             not_found;
@@ -138,87 +139,72 @@ get(State = #state{path = [?UUID(User) | _]}) ->
     ?MSnarl(?P(State), Start),
     R.
 
-permission_required(#state{method = <<"GET">>, path = []}) ->
+permission_required(get, []) ->
     {ok, [<<"cloud">>, <<"users">>, <<"list">>]};
 
-permission_required(#state{method = <<"POST">>, path = []}) ->
+permission_required(post, []) ->
     {ok, [<<"cloud">>, <<"users">>, <<"create">>]};
 
-permission_required(#state{method = <<"GET">>, path = [?UUID(User)]}) ->
+permission_required(get, [?UUID(User)]) ->
     {ok, [<<"users">>, User, <<"get">>]};
 
-permission_required(#state{method = <<"PUT">>, path = [?UUID(User)]}) ->
+permission_required(put, [?UUID(User)]) ->
     {ok, [<<"users">>, User, <<"passwd">>]};
 
-permission_required(#state{method = <<"DELETE">>, path = [?UUID(User)]}) ->
+permission_required(delete, [?UUID(User)]) ->
     {ok, [<<"users">>, User, <<"delete">>]};
 
-permission_required(#state{method = <<"GET">>,
-                           path = [?UUID(User), <<"permissions">> | _]}) ->
+permission_required(get, [?UUID(User), <<"permissions">> | _]) ->
     {ok, [<<"users">>, User, <<"get">>]};
 
-permission_required(#state{method = <<"POST">>,
-                           path = [?UUID(User), <<"tokens">>]}) ->
+permission_required(post, [?UUID(User), <<"tokens">>]) ->
     {ok, [<<"users">>, User, <<"edit">>]};
 
-permission_required(#state{method = <<"DELETE">>,
-                           path = [?UUID(User), <<"tokens">>, _Token]}) ->
+permission_required(delete, [?UUID(User), <<"tokens">>, _Token]) ->
     {ok, [<<"users">>, User, <<"edit">>]};
- 
-permission_required(#state{method = <<"PUT">>,
-                           path = [?UUID(User), <<"permissions">> | Permission]}) ->
+
+permission_required(put, [?UUID(User), <<"permissions">> | Permission]) ->
     {multiple, [[<<"users">>, User, <<"grant">>], Permission]};
 
-permission_required(#state{method = <<"DELETE">>,
-                           path = [?UUID(User), <<"permissions">> | Permission]}) ->
+permission_required(delete, [?UUID(User), <<"permissions">> | Permission]) ->
     {multiple, [[<<"users">>, User, <<"revoke">>], Permission]};
 
 
-permission_required(#state{method = <<"PUT">>,
-                           path = [?UUID(User), <<"roles">>, Role]}) ->
+permission_required(put, [?UUID(User), <<"roles">>, Role]) ->
     {multiple, [[<<"users">>, User, <<"join">>],
                 [<<"roles">>, Role, <<"join">>]]};
 
-permission_required(#state{method = <<"DELETE">>,
-                           path = [?UUID(User), <<"roles">>, Role]}) ->
+permission_required(delete, [?UUID(User), <<"roles">>, Role]) ->
     {multiple, [[<<"users">>, User, <<"leave">>],
                 [<<"roles">>, Role, <<"leave">>]]};
 
-permission_required(#state{method = <<"PUT">>,
-                           path = [?UUID(User), <<"orgs">>, Org]}) ->
+permission_required(put, [?UUID(User), <<"orgs">>, Org]) ->
     {multiple, [[<<"users">>, User, <<"join">>],
                 [<<"orgs">>, Org, <<"join">>]]};
 
-permission_required(#state{method = <<"DELETE">>,
-                           path = [?UUID(User), <<"orgs">>, Org]}) ->
+permission_required(delete, [?UUID(User), <<"orgs">>, Org]) ->
     {multiple, [[<<"users">>, User, <<"leave">>],
                 [<<"orgs">>, Org, <<"leave">>]]};
 
-permission_required(#state{method = <<"PUT">>,
-                           path = [?UUID(User), <<"metadata">> | _]}) ->
+permission_required(put, [?UUID(User), <<"metadata">> | _]) ->
     {ok, [<<"users">>, User, <<"edit">>]};
 
-permission_required(#state{method = <<"DELETE">>,
-                           path = [?UUID(User), <<"metadata">> | _]}) ->
+permission_required(delete, [?UUID(User), <<"metadata">> | _]) ->
     {ok, [<<"users">>, User, <<"edit">>]};
 
-permission_required(#state{method = <<"PUT">>,
-                           path = [?UUID(User), <<"keys">>]}) ->
+permission_required(put, [?UUID(User), <<"keys">>]) ->
     {ok, [<<"users">>, User, <<"edit">>]};
 
-permission_required(#state{method = <<"DELETE">>,
-                           path = [?UUID(User), <<"keys">>, _KeyID]}) ->
+permission_required(delete, [?UUID(User), <<"keys">>, _KeyID]) ->
     {ok, [<<"users">>, User, <<"edit">>]};
 
-permission_required(#state{method = <<"PUT">>,
-                           path = [?UUID(User), <<"yubikeys">>]}) ->
+permission_required(put, [?UUID(User), <<"yubikeys">>]) ->
     {ok, [<<"users">>, User, <<"edit">>]};
 
-permission_required(#state{method = <<"DELETE">>,
-                           path = [?UUID(User), <<"yubikeys">>, _KeyID]}) ->
+permission_required(delete, [?UUID(User), <<"yubikeys">>, _KeyID]) ->
     {ok, [<<"users">>, User, <<"edit">>]};
 
-permission_required(_State) ->
+permission_required(_Method, _Path) ->
     undefined.
 
 %%--------------------------------------------------------------------
@@ -343,7 +329,8 @@ create(Req, State = #state{path = [?UUID(User), <<"tokens">>], version = ?V2},
 %% Put
 %%--------------------------------------------------------------------
 
-write(Req, State = #state{path =  [?UUID(User)]}, [{<<"password">>, Password}]) ->
+write(Req,
+      State = #state{path =  [?UUID(User)]}, [{<<"password">>, Password}]) ->
     Start = erlang:system_time(micro_seconds),
     ok = ls_user:passwd(User, Password),
     ?MSnarl(?P(State), Start),
@@ -353,9 +340,11 @@ write(Req, State = #state{path =  [?UUID(User)]}, [{<<"password">>, Password}]) 
 write(Req, State = #state{method = <<"POST">>, path = []}, _) ->
     {true, Req, State};
 
-write(Req, State = #state{path = [?UUID(User), <<"metadata">> | Path]}, [{K, V}]) ->
+write(Req, State = #state{path = [?UUID(User), <<"metadata">> | Path]},
+      [{K, V}]) ->
     Start = erlang:system_time(micro_seconds),
-    ok = ls_user:set_metadata(User, [{[<<"public">> | Path] ++ [K], jsxd:from_list(V)}]),
+    ok = ls_user:set_metadata(User, [{[<<"public">> | Path] ++ [K],
+                                      jsxd:from_list(V)}]),
     e2qc:evict(?CACHE, User),
     e2qc:teardown(?FULL_CACHE),
     ?MSnarl(?P(State), Start),
@@ -363,7 +352,7 @@ write(Req, State = #state{path = [?UUID(User), <<"metadata">> | Path]}, [{K, V}]
 
 write(Req, State = #state{path = [?UUID(User), <<"keys">>]}, [{KeyID, Key}]) ->
     case re:split(Key, " ") of
-        [_,ID,_] ->
+        [_, ID, _] ->
             try
                 %% We do this to ensure it can be decoded!
                 base64:decode(ID),
@@ -435,7 +424,8 @@ write(Req, State = #state{path = [?UUID(User), <<"orgs">>, Org]},
     ?MSnarl(?P(State), Start),
     {true, Req, State};
 
-write(Req, State = #state{path = [?UUID(User), <<"permissions">> | Permission]}, _) ->
+write(Req, State = #state{path = [?UUID(User), <<"permissions">>
+                                      | Permission]}, _) ->
     Start = erlang:system_time(micro_seconds),
     ok = ls_user:grant(User, Permission),
     e2qc:evict(?CACHE, User),
@@ -473,10 +463,12 @@ delete(Req, State = #state{path = [?UUID(User), <<"yubikeys">>, KeyID]}) ->
     {true, Req, State};
 
 delete(Req, State = #state{path = [_User, <<"sessions">>]}) ->
-    Req1 = cowboy_req:set_resp_cookie(<<"x-snarl-token">>, <<"">>, [{max_age, 0}], Req),
+    Req1 = cowboy_req:set_resp_cookie(<<"x-snarl-token">>, <<"">>,
+                                      [{max_age, 0}], Req),
     {true, Req1, State};
 
-delete(Req, State = #state{path = [?UUID(User), <<"permissions">> | Permission]}) ->
+delete(Req, State = #state{path = [?UUID(User), <<"permissions">>
+                                       | Permission]}) ->
     Start = erlang:system_time(micro_seconds),
     ok = ls_user:revoke(User, Permission),
     e2qc:evict(?CACHE, User),

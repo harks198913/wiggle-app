@@ -6,7 +6,7 @@
 -define(FULL_CACHE, hypervisor_full_list).
 
 -export([allowed_methods/3,
-         permission_required/1,
+         permission_required/2,
          get/1,
          read/2,
          write/3,
@@ -27,7 +27,8 @@ allowed_methods(?V2, _Token, [?UUID(_Hypervisor), <<"metrics">>| _]) ->
 allowed_methods(_Version, _Token, [?UUID(_Hypervisor), <<"config">>|_]) ->
     [<<"PUT">>];
 
-allowed_methods(_Version, _Token, [?UUID(_Hypervisor), <<"characteristics">>|_]) ->
+allowed_methods(_Version, _Token,
+                [?UUID(_Hypervisor), <<"characteristics">> | _]) ->
     [<<"PUT">>, <<"DELETE">>];
 
 allowed_methods(_Version, _Token, [?UUID(_Hypervisor), <<"metadata">>|_]) ->
@@ -56,46 +57,46 @@ get(State = #state{path = [?UUID(Hypervisor) | _]}) ->
 get(_State) ->
     not_found.
 
-permission_required(#state{path = []}) ->
+permission_required(get, []) ->
     {ok, [<<"cloud">>, <<"hypervisors">>, <<"list">>]};
 
-permission_required(#state{method = <<"GET">>, path = [?UUID(Hypervisor)]}) ->
+permission_required(get, [?UUID(Hypervisor)]) ->
     {ok, [<<"hypervisors">>, Hypervisor, <<"get">>]};
 
-permission_required(#state{version = ?V2, method = <<"GET">>,
-                           path = [?UUID(Hypervisor), <<"metrics">> | _]}) ->
+permission_required(get, [?UUID(Hypervisor), <<"metrics">> | _]) ->
     {ok, [<<"hypervisors">>, Hypervisor, <<"get">>]};
 
-permission_required(#state{method = <<"DELETE">>, path = [?UUID(Hypervisor)]}) ->
+permission_required(delete, [?UUID(Hypervisor)]) ->
     {ok, [<<"hypervisors">>, Hypervisor, <<"edit">>]};
 
-permission_required(#state{method = <<"PUT">>, path = [?UUID(Hypervisor), <<"config">> | _]}) ->
+permission_required(put, [?UUID(Hypervisor), <<"config">> | _]) ->
     {ok, [<<"hypervisors">>, Hypervisor, <<"edit">>]};
 
-permission_required(#state{method = <<"PUT">>, path = [?UUID(Hypervisor), <<"metadata">> | _]}) ->
+permission_required(put, [?UUID(Hypervisor), <<"metadata">> | _]) ->
     {ok, [<<"hypervisors">>, Hypervisor, <<"edit">>]};
 
-permission_required(#state{method = <<"DELETE">>, path = [?UUID(Hypervisor), <<"metadata">> | _]}) ->
+permission_required(delete, [?UUID(Hypervisor), <<"metadata">> | _]) ->
     {ok, [<<"hypervisors">>, Hypervisor, <<"edit">>]};
 
-permission_required(#state{method = <<"PUT">>, path = [?UUID(Hypervisor), <<"characteristics">> | _]}) ->
+permission_required(put, [?UUID(Hypervisor), <<"characteristics">> | _]) ->
     {ok, [<<"hypervisors">>, Hypervisor, <<"edit">>]};
 
-permission_required(#state{method = <<"DELETE">>, path = [?UUID(Hypervisor), <<"characteristics">> | _]}) ->
+permission_required(delete, [?UUID(Hypervisor), <<"characteristics">> | _]) ->
     {ok, [<<"hypervisors">>, Hypervisor, <<"edit">>]};
 
 
-permission_required(#state{method = <<"PUT">>, path = [?UUID(Hypervisor), <<"services">>]}) ->
+permission_required(put, [?UUID(Hypervisor), <<"services">>]) ->
     {ok, [<<"hypervisors">>, Hypervisor, <<"edit">>]};
 
-permission_required(_State) ->
+permission_required(_Method, _Path) ->
     undefined.
 
 %%--------------------------------------------------------------------
 %% GET
 %%--------------------------------------------------------------------
 
-read(Req, State = #state{token = Token, path = [], full_list=FullList, full_list_fields=Filter}) ->
+read(Req, State = #state{token = Token, path = [], full_list=FullList,
+                         full_list_fields=Filter}) ->
     Start = erlang:system_time(micro_seconds),
     {ok, Permissions} = wiggle_h:get_permissions(Token),
     ?MSnarl(?P(State), Start),
@@ -110,7 +111,8 @@ read(Req, State = #state{token = Token, path = [], full_list=FullList, full_list
     ?MSniffle(?P(State), Start1),
     {Res, Req, State};
 
-read(Req, State = #state{path = [?UUID(_Hypervisor), <<"services">>, Service], obj = Obj}) ->
+read(Req, State = #state{path = [?UUID(_Hypervisor), <<"services">>, Service],
+                         obj = Obj}) ->
     {jsxd:get([Service], [{}], ft_hypervisor:services(Obj)), Req, State};
 
 read(Req, State = #state{path = [?UUID(_Hypervisor)], obj = Obj}) ->
@@ -122,10 +124,13 @@ read(Req, State = #state{path = [?UUID(Hypervisor), <<"metrics">>]}) ->
         {ok, JSON} ->
             {JSON, Req1, State};
         {error, no_results} ->
-            {ok, Req2} = cowboy_req:reply(503, [], <<"Empty result set">>, Req1),
+            {ok, Req2} = cowboy_req:reply(503, [], <<"Empty result set">>,
+                                          Req1),
             {halt, Req2, State};
         {error, no_server} ->
-            {ok, Req2} = cowboy_req:reply(503, [], <<"failed to connect to database">>, Req1),
+            {ok, Req2} = cowboy_req:reply(503, [],
+                                          <<"failed to connect to database">>,
+                                          Req1),
             {halt, Req2, State};
         {error, bad_resolution} ->
             {ok, Req2} = cowboy_req:reply(400, [], <<"bad resolution">>, Req1),
@@ -157,7 +162,8 @@ write(Req, State = #state{path = [?UUID(Hypervisor), <<"config">>]},
     ?MSniffle(?P(State), Start),
     {true, Req, State};
 
-write(Req, State = #state{path = [?UUID(Hypervisor), <<"characteristics">> | Path]}, [{K, V}]) ->
+write(Req, State = #state{path = [?UUID(Hypervisor), <<"characteristics">>
+                                      | Path]}, [{K, V}]) ->
     Start = erlang:system_time(micro_seconds),
     e2qc:evict(?CACHE, Hypervisor),
     e2qc:teardown(?FULL_CACHE),
@@ -166,7 +172,8 @@ write(Req, State = #state{path = [?UUID(Hypervisor), <<"characteristics">> | Pat
     ?MSniffle(?P(State), Start),
     {true, Req, State};
 
-write(Req, State = #state{path = [?UUID(Hypervisor), <<"metadata">> | Path]}, [{K, V}]) ->
+write(Req, State = #state{path = [?UUID(Hypervisor), <<"metadata">> | Path]},
+      [{K, V}]) ->
     Start = erlang:system_time(micro_seconds),
     e2qc:evict(?CACHE, Hypervisor),
     e2qc:teardown(?FULL_CACHE),
@@ -231,7 +238,8 @@ delete(Req, State = #state{path = [?UUID(Hypervisor)]}) ->
     ?MSniffle(?P(State), Start),
     {true, Req, State};
 
-delete(Req, State = #state{path = [?UUID(Hypervisor), <<"characteristics">> | Path]}) ->
+delete(Req, State = #state{path = [?UUID(Hypervisor), <<"characteristics">>
+                                       | Path]}) ->
     Start = erlang:system_time(micro_seconds),
     e2qc:evict(?CACHE, Hypervisor),
     e2qc:teardown(?FULL_CACHE),
@@ -239,7 +247,8 @@ delete(Req, State = #state{path = [?UUID(Hypervisor), <<"characteristics">> | Pa
     ?MSniffle(?P(State), Start),
     {true, Req, State};
 
-delete(Req, State = #state{path = [?UUID(Hypervisor), <<"metadata">> | Path]}) ->
+delete(Req,
+       State = #state{path = [?UUID(Hypervisor), <<"metadata">> | Path]}) ->
     Start = erlang:system_time(micro_seconds),
     e2qc:evict(?CACHE, Hypervisor),
     e2qc:teardown(?FULL_CACHE),
@@ -251,7 +260,8 @@ delete(Req, State = #state{path = [?UUID(Hypervisor), <<"metadata">> | Path]}) -
 %% Internal
 %%--------------------------------------------------------------------
 path_to_erl(P) ->
-    [{N, C} || [{<<"cost">>, C}, {<<"name">>, N}] <- P, is_integer(C), is_binary(N), N /= <<>>].
+    [{N, C} || [{<<"cost">>, C}, {<<"name">>, N}] <- P,
+               is_integer(C), is_binary(N), N /= <<>>].
 
 
 perf(Hv, QS) ->

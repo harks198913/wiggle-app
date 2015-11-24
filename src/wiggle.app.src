@@ -1,7 +1,7 @@
 {application, wiggle,
  [
   {description, "FiFo REST API"},
-  {vsn, "0.7.0"},
+  {vsn, "0.7.1"},
   {registered, []},
   {applications, [
                   kernel,
@@ -14,7 +14,6 @@
                   jsxd,
                   jesse,
                   lager,
-                  lager_watchdog,
                   snmp,
                   mnesia,
                   uuid,

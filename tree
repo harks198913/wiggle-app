@@ -1,10 +1,10 @@
-[0m└─ wiggle─0.7.0
+[0m└─ wiggle─0.7.1
    ├─ cowboy─1.0.2
-   │  ├─ cowlib─1.0.1
-   │  └─ ranch─1.1.0
+   │  ├─ cowlib─1.0.2
+   │  └─ ranch─1.2.0
    ├─ cowboy_oauth─0.2.11
    │  ├─ erlydtl─0.9.2+build.760.ref5ac24d1
-   │  │  └─ eunit_formatters─0.1.2+build.37.ref35e3e6a
+   │  │  └─ eunit_formatters─v0.3.1+build.40.ref6818dc1
    │  ├─ merl─1
    │  └─ oauth2─0.6.0
    ├─ dqe─0.1.23
@@ -18,26 +18,25 @@
    │     └─ erlware_commons─0.18.0
    │        └─ cf─0.2.1
    ├─ e2qc─1.0
-   ├─ fifo_dt─0.1.57
+   ├─ fifo_dt─0.1.58
    │  ├─ libsnarlmatch─0.1.7
    │  └─ riak_dt─2.1.1
    ├─ fifo_s3─0.1.13
    │  ├─ base16─1.0
    │  └─ erlcloud─0.8.6
-   ├─ fifo_spec─0.1.23
+   ├─ fifo_spec─0.1.24
    ├─ folsom_ddb─0.1.20
    ├─ jesse─1.1.5
    ├─ jsx─1.4.5
    ├─ jsxd─0.1.10
    ├─ lager─3.0.1
    │  └─ goldrush─0.1.7
-   ├─ lager_watchdog─0.1.10
-   ├─ libchunter─0.1.41
-   ├─ libsnarl─0.3.34
-   │  └─ mdns_client_lib─0.1.28
+   ├─ libchunter─0.1.42
+   ├─ libsnarl─0.3.35
+   │  └─ mdns_client_lib─0.1.30
    │     ├─ mdns_client─0.1.7
    │     └─ pooler─1.4.0
-   ├─ libsniffle─0.3.31
+   ├─ libsniffle─0.3.32
    ├─ meck─0.8.2
    ├─ msgpack─0.3.3
    └─ uuid─0.4.7

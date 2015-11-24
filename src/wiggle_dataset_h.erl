@@ -17,7 +17,7 @@
 
 -export([allowed_methods/3,
          get/1,
-         permission_required/1,
+         permission_required/2,
          read/2,
          create/3,
          write/3,
@@ -61,64 +61,54 @@ get(State = #state{path = [?UUID(Dataset) | _]}) ->
 get(_State) ->
     not_found.
 
-permission_required(#state{method = <<"POST">>, path = []}) ->
-    {ok, [<<"cloud">>, <<"datasets">>, <<"create">>]};
-
-permission_required(#state{path = []}) ->
+permission_required(get, []) ->
     {ok, [<<"cloud">>, <<"datasets">>, <<"list">>]};
 
-permission_required(#state{method = <<"GET">>, path = [?UUID(Dataset)]}) ->
+permission_required(post, []) ->
+    {ok, [<<"cloud">>, <<"datasets">>, <<"create">>]};
+
+permission_required(get, [?UUID(Dataset)]) ->
     {ok, [<<"datasets">>, Dataset, <<"get">>]};
 
-permission_required(#state{method = <<"PUT">>, path = [?UUID(Dataset)]}) ->
+permission_required(put, [?UUID(Dataset)]) ->
     {ok, [<<"datasets">>, Dataset, <<"edit">>]};
 
-permission_required(#state{method = <<"POST">>, path = [?UUID(Dataset)]}) ->
+permission_required(post, [?UUID(Dataset)]) ->
     {ok, [<<"datasets">>, Dataset, <<"create">>]};
 
-permission_required(#state{method = <<"GET">>, path = [?UUID(Dataset), <<"dataset.gz">>]}) ->
-    {ok, [<<"datasets">>, Dataset, <<"create">>]};
-
-permission_required(#state{method = <<"GET">>, path = [?UUID(Dataset), <<"dataset.bz2">>]}) ->
+permission_required(get, [?UUID(Dataset), <<"dataset.gz">>]) ->
     {ok, [<<"datasets">>, Dataset, <<"export">>]};
 
-permission_required(#state{method = <<"PUT">>, path = [?UUID(Dataset), <<"dataset.gz">>]}) ->
+permission_required(put, [?UUID(Dataset), <<"dataset.gz">>]) ->
     {ok, [<<"datasets">>, Dataset, <<"create">>]};
 
-permission_required(#state{method = <<"PUT">>, path = [?UUID(Dataset), <<"dataset.bz2">>]}) ->
-    {ok, [<<"datasets">>, Dataset, <<"create">>]};
-
-permission_required(#state{method = <<"DELETE">>, path = [?UUID(Dataset)]}) ->
+permission_required(delete, [?UUID(Dataset)]) ->
     {ok, [<<"datasets">>, Dataset, <<"delete">>]};
 
-permission_required(#state{method = <<"PUT">>, version = ?V2,
-                           path = [?UUID(Dataset), <<"networks">>, _]}) ->
+permission_required(put, [?UUID(Dataset), <<"networks">>, _]) ->
     {ok, [<<"datasets">>, Dataset, <<"edit">>]};
 
-permission_required(#state{method = <<"DELETE">>, version = ?V2,
-                           path = [?UUID(Dataset), <<"networks">>, _]}) ->
+permission_required(delete, [?UUID(Dataset), <<"networks">>, _]) ->
     {ok, [<<"datasets">>, Dataset, <<"edit">>]};
 
-permission_required(#state{method = <<"PUT">>, path = [?UUID(Dataset), <<"metadata">> | _]}) ->
+permission_required(put, [?UUID(Dataset), <<"metadata">> | _]) ->
     {ok, [<<"datasets">>, Dataset, <<"edit">>]};
 
-permission_required(#state{method = <<"DELETE">>, path = [?UUID(Dataset), <<"metadata">> | _]}) ->
+permission_required(delete, [?UUID(Dataset), <<"metadata">> | _]) ->
     {ok, [<<"datasets">>, Dataset, <<"edit">>]};
 
-permission_required(_State) ->
+permission_required(_Method, _Path) ->
     undefined.
 
-content_types_accepted(#state{path=[_, <<"dataset.gz">>], method = <<"PUT">>}) ->
-    [
-     {{<<"application">>, <<"x-gzip">>, '*'}, write_raw}
-    ];
+content_types_accepted(
+  #state{method = <<"PUT">>, path=[_, <<"dataset.gz">>]}) ->
+    [{{<<"application">>, <<"x-gzip">>, '*'}, write_raw}];
 content_types_accepted(_) ->
     wiggle_h:accepted().
 
-content_types_provided(#state{path=[_, <<"dataset.gz">>], method = <<"GET">>}) ->
-    [
-     {{<<"application">>, <<"x-gzip">>, []}, read_raw}
-    ];
+content_types_provided(
+  #state{method = <<"GET">>, path=[_, <<"dataset.gz">>]}) ->
+    [{{<<"application">>, <<"x-gzip">>, []}, read_raw}];
 content_types_provided(_) ->
     wiggle_h:provided().
 
@@ -126,7 +116,8 @@ content_types_provided(_) ->
 %% GET
 %%--------------------------------------------------------------------
 
-read(Req, State = #state{token = Token, path = [], full_list=FullList, full_list_fields=Filter}) ->
+read(Req, State = #state{token = Token, path = [], full_list=FullList,
+                         full_list_fields=Filter}) ->
     Start = erlang:system_time(micro_seconds),
     {ok, Permissions} = wiggle_h:get_permissions(Token),
     ?MSnarl(?P(State), Start),
@@ -155,7 +146,7 @@ read(Req, State = #state{path = [UUID, <<"dataset.gz">>], obj = _Obj}) ->
               {secret_key, SKey}],
     {ok, D} = fifo_s3_download:new(UUID, Config),
     StreamFun = fun(SendChunk) ->
-                        do_strea(SendChunk, D)
+                        do_stream(SendChunk, D)
                 end,
     {{chunked, StreamFun}, Req, State}.
 
@@ -185,14 +176,16 @@ create(Req, State = #state{path = [], version = Version}, Decoded) ->
             Start = erlang:system_time(micro_seconds),
             {ok, UUID} = ls_dataset:import(URL),
             ?MSniffle(?P(State), Start),
-            {{true, <<"/api/", Version/binary, "/datasets/", UUID/binary>>}, Req, State#state{body = Decoded}};
+            {{true, <<"/api/", Version/binary, "/datasets/", UUID/binary>>},
+             Req, State#state{body = Decoded}};
         [{<<"config">>, Config},
          {<<"snapshot">>, Snap},
          {<<"vm">>, Vm}] ->
             Start1 = erlang:system_time(micro_seconds),
             {ok, UUID} = ls_vm:promote_snapshot(Vm, Snap, Config),
             ?MSniffle(?P(State), Start1),
-            {{true, <<"/api/", Version/binary, "/datasets/", UUID/binary>>}, Req, State#state{body = Decoded}}
+            {{true, <<"/api/", Version/binary, "/datasets/", UUID/binary>>},
+             Req, State#state{body = Decoded}}
     end.
 
 %%--------------------------------------------------------------------
@@ -223,7 +216,8 @@ write(Req, State = #state{path = [UUID, <<"dataset.gz">>]}, _) ->
             {false, Req, State}
     end;
 
-write(Req, State = #state{path = [?UUID(Dataset), <<"metadata">> | Path]}, [{K, V}]) ->
+write(Req, State = #state{path = [?UUID(Dataset), <<"metadata">> | Path]},
+      [{K, V}]) ->
     Start = erlang:system_time(micro_seconds),
     ok = ls_dataset:set_metadata(Dataset, [{Path ++ [K], jsxd:from_list(V)}]),
     e2qc:evict(?CACHE, Dataset),
@@ -232,11 +226,11 @@ write(Req, State = #state{path = [?UUID(Dataset), <<"metadata">> | Path]}, [{K, 
     {true, Req, State};
 
 write(Req, State = #state{path = [?UUID(Dataset), <<"networks">>, NIC],
-                          obj = Obj, version = ?V2},
+                          obj = Obj},
       [{<<"description">>, Desc}]) ->
     Start = erlang:system_time(micro_seconds),
-    [ls_dataset:remove_network(Dataset, E) || E = {_NIC, _} <- ft_dataset:networks(Obj),
-                                              _NIC =:= NIC],
+    [ls_dataset:remove_network(Dataset, E) ||
+        E = {_NIC, _} <- ft_dataset:networks(Obj), _NIC =:= NIC],
     ls_dataset:add_network(Dataset, {NIC, Desc}),
     e2qc:evict(?CACHE, Dataset),
     e2qc:teardown(?FULL_CACHE),
@@ -386,8 +380,9 @@ import_dataset_s3(UUID, Idx, TotalSize, {State, Req}, ChunkSize, Upload, Ctx,
             Idx1 = Idx + 1,
             Done = (Idx1 * ChunkSize) / TotalSize,
             ls_dataset:imported(UUID, Done),
-            import_dataset_s3(UUID, Idx1, TotalSize, {State, Req},
-                              ChunkSize, Upload, Ctx, Acc1);
+            SR = {State, Req},
+            import_dataset_s3(UUID, Idx1, TotalSize, SR, ChunkSize, Upload,
+                              Ctx, Acc1);
         {error, E} ->
             fifo_s3_upload:abort(Upload),
             lager:error("Upload error: ~p", [E]),
@@ -431,8 +426,8 @@ import_dataset_s3(UUID, Idx, TotalSize, {more, Req}, ChunkSize, Upload, Ctx,
     {State, Data, Req1} = cowboy_req:body(Req, []),
     Ctx1 = crypto:hash_update(Ctx, Data),
     Acc1 = <<Acc/binary, Data/binary>>,
-    import_dataset_s3(UUID, Idx, TotalSize, {State, Req1},
-                      ChunkSize, Upload, Ctx1, Acc1).
+    SR = {State, Req1},
+    import_dataset_s3(UUID, Idx, TotalSize, SR, ChunkSize, Upload, Ctx1, Acc1).
 
 ensure_integer(I) when is_integer(I) ->
     I;
@@ -441,11 +436,11 @@ ensure_integer(L) when is_list(L) ->
 ensure_integer(B) when is_binary(B) ->
     binary_to_integer(B).
 
-do_strea(SendChunk, D) ->
+do_stream(SendChunk, D) ->
     case fifo_s3_download:get(D) of
         {ok, done} ->
             ok;
         {ok, Data} ->
             SendChunk(binary:copy(Data)),
-            do_strea(SendChunk,D)
+            do_stream(SendChunk, D)
     end.

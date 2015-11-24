@@ -10,7 +10,7 @@
 
 -export([allowed_methods/3,
          get/1,
-         permission_required/1,
+         permission_required/2,
          read/2,
          create/3,
          write/3,
@@ -46,38 +46,39 @@ get(State = #state{path = [?UUID(Iprange) | _]}) ->
 get(_State) ->
     not_found.
 
-permission_required(#state{method = <<"GET">>, path = []}) ->
+permission_required(get, []) ->
     {ok, [<<"cloud">>, <<"ipranges">>, <<"list">>]};
 
-permission_required(#state{method = <<"POST">>, path = []}) ->
+permission_required(post, []) ->
     {ok, [<<"cloud">>, <<"ipranges">>, <<"create">>]};
 
-permission_required(#state{method = <<"GET">>, path = [?UUID(Iprange)]}) ->
+permission_required(get, [?UUID(Iprange)]) ->
     {ok, [<<"ipranges">>, Iprange, <<"get">>]};
 
-permission_required(#state{method = <<"DELETE">>, path = [?UUID(Iprange)]}) ->
+permission_required(delete, [?UUID(Iprange)]) ->
     {ok, [<<"ipranges">>, Iprange, <<"delete">>]};
 
-permission_required(#state{method = <<"PUT">>, path = [?UUID(Iprange)]}) ->
+permission_required(put, [?UUID(Iprange)]) ->
     {ok, [<<"ipranges">>, Iprange, <<"edit">>]};
 
-permission_required(#state{method = <<"DELETE">>, path = [?UUID(Iprange), _IP]}) ->
+permission_required(delete, [?UUID(Iprange), _IP]) ->
     {ok, [<<"ipranges">>, Iprange, <<"edit">>]};
 
-permission_required(#state{method = <<"PUT">>, path = [?UUID(Iprange), <<"metadata">> | _]}) ->
+permission_required(put, [?UUID(Iprange), <<"metadata">> | _]) ->
     {ok, [<<"ipranges">>, Iprange, <<"edit">>]};
 
-permission_required(#state{method = <<"DELETE">>, path = [?UUID(Iprange), <<"metadata">> | _]}) ->
+permission_required(delete, [?UUID(Iprange), <<"metadata">> | _]) ->
     {ok, [<<"ipranges">>, Iprange, <<"edit">>]};
 
-permission_required(_State) ->
+permission_required(_Method, _Path) ->
     undefined.
 
 %%--------------------------------------------------------------------
 %% GET
 %%--------------------------------------------------------------------
 
-read(Req, State = #state{token = Token, path = [], full_list=FullList, full_list_fields=Filter}) ->
+read(Req, State = #state{token = Token, path = [], full_list=FullList,
+                         full_list_fields=Filter}) ->
     Start = erlang:system_time(micro_seconds),
     {ok, Permissions} = wiggle_h:get_permissions(Token),
     ?MSnarl(?P(State), Start),
@@ -143,7 +144,8 @@ create(Req, State = #state{path = [], version = Version}, Data) ->
     {ok, Tag} = jsxd:get(<<"tag">>, Data),
     Vlan = jsxd:get(<<"vlan">>, 0, Data),
     Start = erlang:system_time(micro_seconds),
-    case ls_iprange:create(Iprange, Network, Gateway, Netmask, First, Last, Tag, Vlan) of
+    case ls_iprange:create(Iprange, Network, Gateway, Netmask, First, Last,
+                           Tag, Vlan) of
         {ok, UUID} ->
             ?MSniffle(?P(State), Start),
             e2qc:teardown(?LIST_CACHE),
@@ -188,7 +190,8 @@ write(Req, State = #state{path = [?UUID(Iprange)]}, _) ->
             {false, Req, State}
     end;
 
-write(Req, State = #state{path = [?UUID(Iprange), <<"metadata">> | Path]}, [{K, V}]) ->
+write(Req, State = #state{path = [?UUID(Iprange), <<"metadata">> | Path]},
+      [{K, V}]) ->
     Start = erlang:system_time(micro_seconds),
     e2qc:evict(?CACHE, Iprange),
     e2qc:teardown(?FULL_CACHE),

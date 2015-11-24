@@ -92,6 +92,7 @@ dispatches(API, UIDir) ->
             undefined ->
                 [];
             _ ->
-                [{"/", cowboy_static, {file, filename:join(UIDir, "index.html")}},
+                [{"/", cowboy_static,
+                  {file, filename:join(UIDir, "index.html")}},
                  {"/[...]", cowboy_static, {dir, UIDir}}]
         end.

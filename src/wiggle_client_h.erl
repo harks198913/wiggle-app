@@ -1,14 +1,3 @@
-%% {
-%%   "client_id":"Client1",
-%%   "metadata":{},
-%%   "name":"This Cool Test Client",
-%%   "permissions":[],
-%%   "redirect_uris":["http://client.uri","https://developers.google.com/oauthplayground"],
-%%   "roles":[],
-%%   "type":"public",
-%%   "uuid":"308f8590-bc66-4f6c-bec5-2ff0c01d063c"
-%% }
-
 -module(wiggle_client_h).
 -include("wiggle.hrl").
 
@@ -22,7 +11,7 @@
 
 -export([allowed_methods/3,
          get/1,
-         permission_required/1,
+         permission_required/2,
          read/2,
          create/3,
          write/3,
@@ -61,48 +50,48 @@ get(State = #state{path = [?UUID(Client) | _]}) ->
     ?MSnarl(?P(State), Start),
     R.
 
-permission_required(#state{method = <<"GET">>, path = []}) ->
+permission_required(get, []) ->
     {ok, [<<"cloud">>, <<"clients">>, <<"list">>]};
 
-permission_required(#state{method = <<"POST">>, path = []}) ->
+permission_required(post, []) ->
     {ok, [<<"cloud">>, <<"clients">>, <<"create">>]};
 
-permission_required(#state{method = <<"GET">>, path = [?UUID(Client)]}) ->
+permission_required(get, [?UUID(Client)]) ->
     {ok, [<<"clients">>, Client, <<"get">>]};
 
-permission_required(#state{method = <<"PUT">>, path = [?UUID(Client)]}) ->
+permission_required(put, [?UUID(Client)]) ->
     {ok, [<<"clients">>, Client, <<"edit">>]};
 
-permission_required(#state{method = <<"DELETE">>, path = [?UUID(Client)]}) ->
+permission_required(delete, [?UUID(Client)]) ->
     {ok, [<<"clients">>, Client, <<"delete">>]};
 
-permission_required(#state{method = <<"PUT">>,
-                           path = [?UUID(Client), <<"permissions">> | _]}) ->
+permission_required(put, [?UUID(Client), <<"permissions">> | _]) ->
     {ok, [<<"clients">>, Client, <<"grant">>]};
 
-permission_required(#state{method = <<"DELETE">>,
-                           path = [?UUID(Client), <<"permissions">> | _]}) ->
+permission_required(delete, [?UUID(Client), <<"permissions">> | _]) ->
     {ok, [<<"clients">>, Client, <<"revoke">>]};
 
-permission_required(#state{method = <<"POST">>,
-                           path = [?UUID(Client), <<"uris">>]}) ->
+permission_required(post, [?UUID(Client), <<"uris">>]) ->
     {ok, [<<"clients">>, Client, <<"edit">>]};
 
-permission_required(#state{method = <<"DELETE">>,
-                           path = [?UUID(Client), <<"uris">>, _]}) ->
+permission_required(delete, [?UUID(Client), <<"uris">>, _]) ->
     {ok, [<<"clients">>, Client, <<"edit">>]};
 
-permission_required(#state{path = [?UUID(Client), <<"metadata">> | _]}) ->
+permission_required(put, [?UUID(Client), <<"metadata">> | _]) ->
     {ok, [<<"clients">>, Client, <<"edit">>]};
 
-permission_required(_State) ->
+permission_required(delete, [?UUID(Client), <<"metadata">> | _]) ->
+    {ok, [<<"clients">>, Client, <<"edit">>]};
+
+permission_required(_Method, _Path) ->
     undefined.
 
 %%--------------------------------------------------------------------
 %% GET
 %%--------------------------------------------------------------------
 
-read(Req, State = #state{token = Token, path = [], full_list=FullList, full_list_fields=Filter}) ->
+read(Req, State = #state{token = Token, path = [], full_list=FullList,
+                         full_list_fields=Filter}) ->
     Start = erlang:system_time(micro_seconds),
     {ok, Permissions} = wiggle_h:get_permissions(Token),
     ?MSnarl(?P(State), Start),
@@ -126,7 +115,7 @@ read(Req, State = #state{path = [_Client], obj = ClientObj}) ->
 %% PUT
 %%--------------------------------------------------------------------
 
-create(Req, State = #state{token = Token, path = [], version = Version}, 
+create(Req, State = #state{token = Token, path = [], version = Version},
        [{<<"client">>, Client},
         {<<"secret">>, Secret}]) ->
     {ok, Creator} = ls_user:get(Token),
@@ -162,9 +151,11 @@ write(Req, State = #state{path =  [?UUID(Client)]}, [{<<"secret">>, Secret}]) ->
     ?MSnarl(?P(State), Start),
     {true, Req, State};
 
-write(Req, State = #state{path = [?UUID(Client), <<"metadata">> | Path]}, [{K, V}]) ->
+write(Req, State = #state{path = [?UUID(Client), <<"metadata">> | Path]},
+      [{K, V}]) ->
     Start = erlang:system_time(micro_seconds),
-    ok = ls_client:set_metadata(Client, [{[<<"public">> | Path] ++ [K], jsxd:from_list(V)}]),
+    ok = ls_client:set_metadata(Client, [{[<<"public">> | Path] ++ [K],
+                                          jsxd:from_list(V)}]),
     e2qc:evict(?CACHE, Client),
     e2qc:teardown(?FULL_CACHE),
     ?MSnarl(?P(State), Start),
@@ -182,7 +173,8 @@ delete(Req, State = #state{path = [?UUID(Client), <<"metadata">> | Path]}) ->
     ?MSnarl(?P(State), Start),
     {true, Req, State};
 
-delete(Req, State = #state{path = [?UUID(Client), <<"uris">>, URIHash], obj = Obj}) ->
+delete(Req, State = #state{path = [?UUID(Client), <<"uris">>, URIHash],
+                           obj = Obj}) ->
     URIs = ft_client:uris(Obj),
     ID = binary_to_integer(URIHash),
     Found = lists:filter(fun(ThisURI) ->

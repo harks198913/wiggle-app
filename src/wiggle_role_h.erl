@@ -11,7 +11,7 @@
 
 -export([allowed_methods/3,
          get/1,
-         permission_required/1,
+         permission_required/2,
          read/2,
          create/3,
          write/3,
@@ -28,7 +28,8 @@ allowed_methods(_Version, _Token, [?UUID(_Role)]) ->
 allowed_methods(_Version, _Token, [?UUID(_Role), <<"metadata">> | _]) ->
     [<<"PUT">>, <<"DELETE">>];
 
-allowed_methods(_Version, _Token, [?UUID(_Role), <<"permissions">> | _Permission]) ->
+allowed_methods(_Version, _Token, [?UUID(_Role), <<"permissions">>
+                                       | _Permission]) ->
     [<<"PUT">>, <<"DELETE">>].
 
 get(State = #state{path = [?UUID(Role), <<"permissions">> | Permission]}) ->
@@ -58,36 +59,36 @@ get(State = #state{path = [?UUID(Role) | _]}) ->
     ?MSnarl(?P(State), Start),
     R.
 
-permission_required(#state{method = <<"GET">>, path = []}) ->
+permission_required(get, []) ->
     {ok, [<<"cloud">>, <<"roles">>, <<"list">>]};
 
-permission_required(#state{method = <<"POST">>, path = []}) ->
+permission_required(post, []) ->
     {ok, [<<"cloud">>, <<"roles">>, <<"create">>]};
 
-permission_required(#state{method = <<"GET">>, path = [?UUID(Role)]}) ->
+permission_required(get, [?UUID(Role)]) ->
     {ok, [<<"roles">>, Role, <<"get">>]};
 
-permission_required(#state{method = <<"PUT">>, path = [?UUID(Role)]}) ->
+permission_required(put, [?UUID(Role)]) ->
     {ok, [<<"roles">>, Role, <<"create">>]};
 
-permission_required(#state{method = <<"DELETE">>, path = [?UUID(Role)]}) ->
+permission_required(delete, [?UUID(Role)]) ->
     {ok, [<<"roles">>, Role, <<"delete">>]};
 
-permission_required(#state{method = <<"PUT">>, path = [?UUID(Role), <<"permissions">> | Permission]}) ->
+permission_required(put, [?UUID(Role), <<"permissions">> | Permission]) ->
     {multiple, [[<<"roles">>, Role, <<"grant">>],
                 [<<"permissions">>, Permission, <<"grant">>]]};
 
-permission_required(#state{method = <<"DELETE">>, path = [?UUID(Role), <<"permissions">> | Permission]}) ->
+permission_required(delete, [?UUID(Role), <<"permissions">> | Permission]) ->
     {multiple, [[<<"roles">>, Role, <<"revoke">>],
                 [<<"permissions">>, Permission, <<"revoke">>]]};
 
-permission_required(#state{method = <<"PUT">>, path = [?UUID(Role), <<"metadata">> | _]}) ->
+permission_required(put, [?UUID(Role), <<"metadata">> | _]) ->
     {ok, [<<"roles">>, Role, <<"edit">>]};
 
-permission_required(#state{method = <<"DELETE">>, path = [?UUID(Role), <<"metadata">> | _]}) ->
+permission_required(delete, [?UUID(Role), <<"metadata">> | _]) ->
     {ok, [<<"roles">>, Role, <<"edit">>]};
 
-permission_required(_State) ->
+permission_required(_Method, _Path) ->
     undefined.
 
 %%--------------------------------------------------------------------
@@ -95,7 +96,8 @@ permission_required(_State) ->
 %%--------------------------------------------------------------------
 
 
-read(Req, State = #state{token = Token, path = [], full_list=FullList, full_list_fields=Filter}) ->
+read(Req, State = #state{token = Token, path = [], full_list=FullList,
+                         full_list_fields=Filter}) ->
     Start = erlang:system_time(micro_seconds),
     {ok, Permissions} = wiggle_h:get_permissions(Token),
     ?MSnarl(?P(State), Start),
@@ -123,21 +125,25 @@ create(Req, State = #state{path = [], version = Version}, Decoded) ->
     {ok, UUID} = ls_role:add(Role),
     e2qc:teardown(?LIST_CACHE),
     ?MSnarl(?P(State), Start),
-    {{true, <<"/api/", Version/binary, "/roles/", UUID/binary>>}, Req, State#state{body = Decoded}}.
+    {{true, <<"/api/", Version/binary, "/roles/", UUID/binary>>},
+     Req, State#state{body = Decoded}}.
 
 %% TODO : This is a icky case it is called after post.
 write(Req, State = #state{method = <<"POST">>, path = []}, _) ->
     {true, Req, State};
 
-write(Req, State = #state{path = [?UUID(Role), <<"metadata">> | Path]}, [{K, V}]) when is_binary(Role) ->
+write(Req, State = #state{path = [?UUID(Role), <<"metadata">> | Path]},
+      [{K, V}]) when is_binary(Role) ->
     Start = erlang:system_time(micro_seconds),
     e2qc:evict(?CACHE, Role),
     e2qc:teardown(?LIST_CACHE),
-    ls_role:set_metadata(Role, [{[<<"public">> | Path] ++ [K], jsxd:from_list(V)}]),
+    ls_role:set_metadata(Role, [{[<<"public">> | Path] ++ [K],
+                                 jsxd:from_list(V)}]),
     ?MSnarl(?P(State), Start),
     {true, Req, State};
 
-write(Req, State = #state{path = [?UUID(Role), <<"permissions">> | Permission]}, _Body) ->
+write(Req, State = #state{path = [?UUID(Role), <<"permissions">> | Permission]},
+      _Body) ->
     Start = erlang:system_time(micro_seconds),
     e2qc:evict(?CACHE, Role),
     e2qc:teardown(?LIST_CACHE),
@@ -157,7 +163,8 @@ delete(Req, State = #state{path = [?UUID(Role), <<"metadata">> | Path]}) ->
     ?MSnarl(?P(State), Start),
     {true, Req, State};
 
-delete(Req, State = #state{path = [?UUID(Role), <<"permissions">> | Permission]}) ->
+delete(Req, State = #state{path = [?UUID(Role), <<"permissions">>
+                                       | Permission]}) ->
     Start = erlang:system_time(micro_seconds),
     e2qc:evict(?CACHE, Role),
     e2qc:teardown(?LIST_CACHE),

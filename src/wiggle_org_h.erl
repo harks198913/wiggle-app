@@ -11,7 +11,7 @@
 
 -export([allowed_methods/3,
          get/1,
-         permission_required/1,
+         permission_required/3,
          read/2,
          create/3,
          write/3,
@@ -54,85 +54,72 @@ get(State = #state{path = [?UUID(Org) | _]}) ->
 get(_State) ->
     not_found.
 
-permission_required(#state{method = <<"GET">>, path = []}) ->
+permission_required(get, [], _) ->
     {ok, [<<"cloud">>, <<"orgs">>, <<"list">>]};
 
-permission_required(#state{method = <<"POST">>, path = []}) ->
+permission_required(post, [], _) ->
     {ok, [<<"cloud">>, <<"orgs">>, <<"create">>]};
 
-permission_required(#state{method = <<"GET">>, path = [?UUID(Org)]}) ->
+permission_required(get, [?UUID(Org)], _) ->
     {ok, [<<"orgs">>, Org, <<"get">>]};
 
-permission_required(#state{method = <<"GET">>,
-                           path = [?UUID(Org), <<"accounting">>]}) ->
+permission_required(get, [?UUID(Org), <<"accounting">>], _) ->
     {ok, [<<"orgs">>, Org, <<"get">>]};
 
-permission_required(#state{method = <<"PUT">>, path = [?UUID(Org)]}) ->
+permission_required(put, [?UUID(Org)], _) ->
     {ok, [<<"orgs">>, Org, <<"create">>]};
 
-permission_required(#state{method = <<"DELETE">>, path = [?UUID(Org)]}) ->
+permission_required(delete, [?UUID(Org)], _) ->
     {ok, [<<"orgs">>, Org, <<"delete">>]};
 
-permission_required(#state{method = <<"POST">>,
-                           path = [?UUID(_Org), <<"triggers">> | _],
-                           body = undefined}) ->
+permission_required(post, [?UUID(_Org), <<"triggers">> | _],
+                    #state{body = undefined}) ->
     {error, needs_decode};
 
-permission_required(#state{method = <<"POST">>,
-                           path = [?UUID(Org), <<"triggers">> | _],
-                           body = [{<<"action">>, <<"role_grant">>},
+permission_required(post, [?UUID(Org), <<"triggers">> | _],
+                    #state{body = [{<<"action">>, <<"role_grant">>},
                                    {<<"base">>, _},
                                    {<<"permission">>, _},
                                    {<<"target">>, Role}]}) ->
     {multiple, [[<<"orgs">>, Org, <<"edit">>],
                 [<<"roles">>, Role, <<"grant">>]]};
 
-permission_required(#state{method = <<"POST">>,
-                           path = [?UUID(Org), <<"triggers">> | _],
-                           body = [{<<"action">>, <<"user_grant">>},
+permission_required(post, [?UUID(Org), <<"triggers">> | _],
+                    #state{body = [{<<"action">>, <<"user_grant">>},
                                    {<<"base">>, _Base},
                                    {<<"permission">>, _Permission},
                                    {<<"target">>, User}]}) ->
     {multiple, [[<<"orgs">>, Org, <<"edit">>],
                 [<<"users">>, User, <<"grant">>]]};
 
-permission_required(#state{method = <<"POST">>,
-                           path = [?UUID(Org), <<"triggers">> | _],
-                           body = [{<<"action">>, <<"join_role">>},
+permission_required(post, [?UUID(Org), <<"triggers">> | _],
+                    #state{body = [{<<"action">>, <<"join_role">>},
                                    {<<"target">>, Role}]}) ->
     {multiple, [[<<"orgs">>, Org, <<"edit">>],
                 [<<"roles">>, Role, <<"join">>]]};
 
-permission_required(#state{
-                       method = <<"POST">>,
-                       path = [?UUID(Org), <<"triggers">> | _],
-                       body = ([{<<"action">>, <<"join_org">>},
-                                {<<"target">>, TargetOrg}])}) ->
+permission_required(post, [?UUID(Org), <<"triggers">> | _],
+                    #state{body = ([{<<"action">>, <<"join_org">>},
+                                    {<<"target">>, TargetOrg}])}) ->
     {multiple, [[<<"orgs">>, Org, <<"edit">>],
                 [<<"orgs">>, TargetOrg, <<"join">>]]};
 
-permission_required(#state{method = <<"DELETE">>,
-                           path = [?UUID(Org), <<"triggers">> | _]}) ->
+permission_required(delete, [?UUID(Org), <<"triggers">> | _], _) ->
     {ok, [<<"orgs">>, Org, <<"edit">>]};
 
-permission_required(#state{method = <<"PUT">>,
-                           path = [?UUID(Org), <<"metadata">> | _]}) ->
+permission_required(put, [?UUID(Org), <<"metadata">> | _], _) ->
     {ok, [<<"orgs">>, Org, <<"edit">>]};
 
-permission_required(#state{method = <<"DELETE">>,
-                           path = [?UUID(Org), <<"metadata">> | _]}) ->
+permission_required(delete, [?UUID(Org), <<"metadata">> | _], _) ->
     {ok, [<<"orgs">>, Org, <<"edit">>]};
 
-permission_required(#state{method = <<"PUT">>,
-                           path = [?UUID(Org), <<"resources">>, _]}) ->
+permission_required(put, [?UUID(Org), <<"resources">>, _], _) ->
     {ok, [<<"orgs">>, Org, <<"edit">>]};
 
-permission_required(#state{method = <<"DELETE">>,
-                           path = [?UUID(Org), <<"resources">>, _]}) ->
+permission_required(delete, [?UUID(Org), <<"resources">>, _], _) ->
     {ok, [<<"orgs">>, Org, <<"edit">>]};
 
-permission_required(State) ->
-    lager:warning("Unknown permission request: ~p.", [State]),
+permission_required(_Method, _Path, _State) ->
     undefined.
 
 %%--------------------------------------------------------------------
@@ -221,7 +208,8 @@ create(Req, State =
 write(Req, State = #state{path = [?UUID(Org), <<"metadata">> | Path]}, [{K, V}])
   when is_binary(Org) ->
     Start = erlang:system_time(micro_seconds),
-    ls_org:set_metadata(Org, [{[<<"public">> | Path] ++ [K], jsxd:from_list(V)}]),
+    ls_org:set_metadata(Org, [{[<<"public">> | Path] ++ [K],
+                               jsxd:from_list(V)}]),
     e2qc:evict(?CACHE, Org),
     e2qc:teardown(?FULL_CACHE),
     ?MSnarl(?P(State), Start),

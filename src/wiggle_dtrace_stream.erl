@@ -16,6 +16,8 @@
 -record(dstate, {id, socket, config, encoder, decoder, type,
                  token, scope_perms = [[<<"...">>]], state=connected}).
 
+-define(SEC_HDR, <<"sec-websocket-protocol">>).
+
 init({_Andy, http}, _Req, _Opts) ->
     {upgrade, protocol, cowboy_websocket}.
 
@@ -27,44 +29,34 @@ e(Code, Msg, Req) ->
     {shutdown, Req1}.
 
 websocket_init(_Any, Req, []) ->
-    {Proto, Req0} = case cowboy_req:parse_header(<<"sec-websocket-protocol">>, Req) of
-                        {ok, undefined, ReqR} ->
-                            {<<"json">>, ReqR};
-                        {ok, [], ReqR} ->
-                            {<<"json">>, ReqR};
-                        {ok, [P |_], ReqR} ->
-                            lager:debug("[dtrace] Setting up protocol to ~s", [P]),
-                            {P, cowboy_req:set_resp_header(<<"sec-websocket-protocol">>, P, ReqR)}
-                    end,
-    {ID, Req1} = cowboy_req:binding(uuid, Req0),
-    Req2 = wiggle_h:set_access_header(Req1),
-    {Encoder, Decoder, Type} = case Proto of
-                                   <<"msgpack">> ->
-                                       {fun(O) ->
-                                                msgpack:pack(O, [jsx])
-                                        end,
-                                        fun(D) ->
-                                                {ok, O} = msgpack:unpack(D, [jsx]),
-                                                jsxd:from_list(O)
-                                        end,
-                                        binary};
-                                   <<"json">> ->
-                                       {fun(O) ->
-                                                jsx:encode(O)
-                                        end,
-                                        fun(D) ->
-                                                jsxd:from_list(jsx:decode(D))
-                                        end, text}
-                               end,
-    case wiggle_h:get_token(#state{}, Req2) of
-        {#state{ token = undefined}, Req3} ->
-            {ok, Req3, #dstate{id = ID, encoder = Encoder, decoder = Decoder,
+    {ok, Ps, Req0} = cowboy_req:parse_header(?SEC_HDR, Req),
+    {Proto, Encoder, Decoder, Type} =
+        case lists:member(<<"msgpack">>, Ps) of
+            true ->
+                {<<"msgpack">>,
+                 fun(O) -> msgpack:pack(O, [jsx]) end,
+                 fun(D) ->
+                         {ok, O} = msgpack:unpack(D, [jsx]),
+                         jsxd:from_list(O)
+                 end,
+                 binary};
+            _ -> {<<"json">>,
+                  fun jsx:encode/1,
+                  fun(D) -> jsxd:from_list(jsx:decode(D)) end,
+                  text}
+        end,
+    Req1 = cowboy_req:set_resp_header(?SEC_HDR, Proto, Req0),
+    {ID, Req2} = cowboy_req:binding(uuid, Req1),
+    Req3 = wiggle_h:set_access_header(Req2),
+    case wiggle_h:get_token(#state{}, Req3) of
+        {#state{ token = undefined}, Req4} ->
+            {ok, Req4, #dstate{id = ID, encoder = Encoder, decoder = Decoder,
                                type = Type}};
-        {#state{token = Token, scope_perms = SPerms}, Req3} ->
+        {#state{token = Token, scope_perms = SPerms}, Req4} ->
             State = #dstate{id = ID, encoder = Encoder, decoder = Decoder,
                             type = Type, token = Token, scope_perms = SPerms,
                             state = authenticated},
-            init(State, Req3)
+            init(State, Req4)
     end.
 
 websocket_handle({Type, M}, Req,
@@ -88,7 +80,8 @@ websocket_handle(_Any, Req, State) ->
     {ok, Req, State}.
 
 websocket_info({tcp, _Port, Data}, Req,
-               State = #dstate{state = authenticated, encoder = Enc, type = Type}) ->
+               State = #dstate{state = authenticated, encoder = Enc,
+                               type = Type}) ->
     case binary_to_term(Data) of
         {dtrace, ok} ->
             {ok, Req, State, hibernate};
@@ -150,11 +143,12 @@ handle(null, Req, State = #dstate{encoder = Enc, type = Type}) ->
     {ok, Servers} = ls_hypervisor:list(),
     case ls_dtrace:run(State#dstate.id, [{<<"servers">>, Servers}]) of
         {ok, S} ->
-            {reply, {Type, Enc([{<<"config">>, jsxd:merge([{<<"servers">>, Servers}], State#dstate.config)}])},
+            {reply,
+             {Type, Enc([{<<"config">>, jsxd:merge([{<<"servers">>, Servers}],
+                                                   State#dstate.config)}])},
              Req, State#dstate{socket = S}};
         E ->
-            {ok, Req1} = cowboy_req:reply(505, [], list_to_binary(io_lib:format("~p", [E])), Req),
-            {shutdown, Req1}
+            e(505, io_lib:format("~p", [E]), Req)
     end;
 
 handle(Config, Req, State  = #dstate{encoder = Enc, type = Type,
@@ -164,7 +158,8 @@ handle(Config, Req, State  = #dstate{encoder = Enc, type = Type,
         {ok, Config1} ->
             {ok, Permissions} = wiggle_h:get_permissions(Token),
             Permission = [{must, 'allowed',
-                           [<<"hypervisors">>, {<<"res">>, <<"uuid">>}, <<"get">>],
+                           [<<"hypervisors">>,
+                            {<<"res">>, <<"uuid">>}, <<"get">>],
                            Permissions}],
             {ok, Servers} = ls_hypervisor:list(Permission, false),
             Config2 = jsxd:update([<<"servers">>], fun(S) ->
@@ -172,11 +167,11 @@ handle(Config, Req, State  = #dstate{encoder = Enc, type = Type,
                                                    end, Servers, Config1),
             case ls_dtrace:run(State#dstate.id, Config2) of
                 {ok, S} ->
-                    {reply, {Type, Enc(jsxd:merge(Config1, State#dstate.config))},
+                    {reply,
+                     {Type, Enc(jsxd:merge(Config1, State#dstate.config))},
                      Req, State#dstate{socket = S}};
                 E ->
-                    {ok, Req1} = cowboy_req:reply(505, [], list_to_binary(io_lib:format("~p", [E])), Req),
-                    {shutdown, Req1}
+                    e(505, io_lib:format("~p", [E]), Req)
             end;
         {error, denied} ->
             e(403, Req)
@@ -187,19 +182,22 @@ update_vms(Config, State) ->
         [] ->
             {ok, Config};
         VMs ->
-            case test_vms(VMs, State) of
-                true ->
-                    VMs0 = [ls_vm:get(V) || V <- VMs],
-                    Servers2 = [ft_vm:hypervisor(V) || {ok, V} <- VMs0],
-                    Filter = [[<<"zonename">>, V] || V <- VMs],
-                    jsxd:thread([{set, [<<"servers">>], lists:usort(Servers2)},
-                                 {update, [<<"filter">>],
-                                  fun (F) ->
-                                          [{<<"and">>, [Filter | F]}]
-                                  end, [{<<"and">>, Filter}]}], Config);
-                false ->
-                    {error, denied}
-            end
+            build_vms(VMs, Config, State)
+    end.
+
+build_vms(VMs, Config, State) ->
+    case test_vms(VMs, State) of
+        true ->
+            VMs0 = [ls_vm:get(V) || V <- VMs],
+            Servers2 = [ft_vm:hypervisor(V) || {ok, V} <- VMs0],
+            Filter = [[<<"zonename">>, V] || V <- VMs],
+            jsxd:thread([{set, [<<"servers">>], lists:usort(Servers2)},
+                         {update, [<<"filter">>],
+                          fun (F) ->
+                                  [{<<"and">>, [Filter | F]}]
+                          end, [{<<"and">>, Filter}]}], Config);
+        false ->
+            {error, denied}
     end.
 
 test_vms([], _State) ->

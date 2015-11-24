@@ -67,11 +67,11 @@ print_endpoints(Es) ->
     [print_endpoint(E) || E <- Es].
 
 
-print_endpoint({{Hostname, [{port,Port},{ip,IP}]}, _, Fails}) ->
+print_endpoint({{Hostname, [{port, Port}, {ip, IP}]}, _, Fails}) ->
     HostPort = <<IP/binary, ":", Port/binary>>,
     io:format("~60s ~-19s ~9b~n", [Hostname, HostPort, Fails]).
 
 print_cache(Cache) ->
-    [{hits,H},{misses,M},{q1size,Q1},{q2size,Q2}] = e2qc:stats(Cache),
+    [{hits, H}, {misses, M}, {q1size, Q1}, {q2size, Q2}] = e2qc:stats(Cache),
     io:format("~20s ~-19b ~-19b ~-19b ~-19b~n", [Cache, H, M, Q1, Q2]).
 
