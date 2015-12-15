@@ -7,7 +7,7 @@
    │  │  └─ eunit_formatters─v0.3.1+build.40.ref6818dc1
    │  ├─ merl─1
    │  └─ oauth2─0.6.0
-   ├─ dqe─0.1.23
+   ├─ dqe─0.1.26
    │  ├─ ddb_client─0.1.17
    │  ├─ dflow─0.1.5
    │  ├─ dproto─0.1.12
@@ -32,7 +32,7 @@
    ├─ lager─3.0.1
    │  └─ goldrush─0.1.7
    ├─ libchunter─0.1.42
-   ├─ libsnarl─0.3.35
+   ├─ libsnarl─0.3.36
    │  └─ mdns_client_lib─0.1.30
    │     ├─ mdns_client─0.1.7
    │     └─ pooler─1.4.0
