@@ -21,8 +21,8 @@
    ├─ fifo_dt─0.1.58
    │  ├─ libsnarlmatch─0.1.7
    │  └─ riak_dt─2.1.1
-   ├─ fifo_s3─0.1.13
-   │  ├─ base16─1.0
+   ├─ fifo_s3─0.1.14
+   │  ├─ base16─1.0.0
    │  └─ erlcloud─0.8.6
    ├─ fifo_spec─0.1.24
    ├─ folsom_ddb─0.1.20
