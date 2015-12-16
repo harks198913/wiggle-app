@@ -152,10 +152,10 @@ create(Req, State = #state{path = [], version = Version, token=Token},
             {halt, Req1, State}
     end.
 
-write(Req, State = #state{path = [?UUID(Grouping), <<"elements">>, IPrange]},
+write(Req, State = #state{path = [?UUID(Grouping), <<"elements">>, Element]},
       _Data) ->
     Start = erlang:system_time(micro_seconds),
-    case ls_grouping:add_element(Grouping, IPrange) of
+    case ls_grouping:add_element(Grouping, Element) of
         ok ->
             e2qc:evict(?CACHE, Grouping),
             e2qc:teardown(?FULL_CACHE),
@@ -166,10 +166,10 @@ write(Req, State = #state{path = [?UUID(Grouping), <<"elements">>, IPrange]},
             {false, Req, State}
     end;
 
-write(Req, State = #state{path = [?UUID(Grouping), <<"groupings">>, IPrange]},
+write(Req, State = #state{path = [?UUID(Grouping), <<"groupings">>, Element]},
       _Data) ->
     Start = erlang:system_time(micro_seconds),
-    case ls_grouping:add_grouping(Grouping, IPrange) of
+    case ls_grouping:add_grouping(Grouping, Element) of
         ok ->
             e2qc:evict(?CACHE, Grouping),
             e2qc:teardown(?FULL_CACHE),
