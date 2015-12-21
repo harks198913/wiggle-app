@@ -11,7 +11,7 @@
  {<<"dproto">>,{pkg,<<"dproto">>,<<"0.1.12">>},1},
  {<<"dqe">>,
   {git,"https://github.com/dalmatinerdb/dqe.git",
-       {ref,"b4a6f7427fcc23b04acbb32b0fee5ebdec8acf45"}},
+       {ref,"6facf2fd2b2bb2607118df023c6cef604d43a777"}},
   0},
  {<<"e2qc">>,
   {git,"https://github.com/arekinath/e2qc.git",
