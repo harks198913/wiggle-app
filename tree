@@ -18,7 +18,7 @@
    │     └─ erlware_commons─0.18.0
    │        └─ cf─0.2.1
    ├─ e2qc─1.0
-   ├─ fifo_dt─0.1.59
+   ├─ fifo_dt─0.1.58
    │  ├─ libsnarlmatch─0.1.7
    │  └─ riak_dt─2.1.1
    ├─ fifo_s3─0.1.14
