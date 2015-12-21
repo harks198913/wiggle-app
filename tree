@@ -7,7 +7,7 @@
    │  │  └─ eunit_formatters─v0.3.1+build.40.ref6818dc1
    │  ├─ merl─1
    │  └─ oauth2─0.6.0
-   ├─ dqe─0.1.28
+   ├─ dqe─0.1.29
    │  ├─ ddb_client─0.1.17
    │  ├─ dflow─0.1.5
    │  ├─ dproto─0.1.12
@@ -18,7 +18,7 @@
    │     └─ erlware_commons─0.18.0
    │        └─ cf─0.2.1
    ├─ e2qc─1.0
-   ├─ fifo_dt─0.1.58
+   ├─ fifo_dt─0.1.59
    │  ├─ libsnarlmatch─0.1.7
    │  └─ riak_dt─2.1.1
    ├─ fifo_s3─0.1.14
