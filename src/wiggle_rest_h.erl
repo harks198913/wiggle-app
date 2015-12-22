@@ -317,9 +317,11 @@ write1(Req, State = #state{body = Data}) ->
                 {ok, _Data} ->
                     write2(Req, State);
                 {error, E} ->
+                    ErrorStr = io_lib:format("~p", [E]),
                     lager:error("[schema:~s] Malformated data: ~p",
                                 [Schema, E]),
-                    {false, Req, State}
+                    {ok, Req2} = cowboy_req:reply(400, [], ErrorStr, Req),
+                    {halt, Req2, State}
             end
     end.
 
