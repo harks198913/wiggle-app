@@ -298,10 +298,12 @@ delete(Req, State = #state{path = [?UUID(Org)]}) ->
 
 to_json(E) ->
     E1 = ft_org:to_json(E),
-    jsxd:update([<<"metadata">>],
-                fun(M) ->
-                        jsxd:get([<<"public">>], [{}], M)
-                end, [{}], E1).
+    E2 = jsxd:update([<<"metadata">>],
+                     fun(M) ->
+                             jsxd:get([<<"public">>], [{}], M)
+                     end, [{}], E1),
+    Docker = jsxd:get([<<"fifo">>, <<"docker">>], [{}], ft_org:metadata(E)),
+    jsxd:set([<<"docker">>], Docker, E2).
 
 erlangify_trigger(<<"user_create">>, Event) ->
     {user_create,
