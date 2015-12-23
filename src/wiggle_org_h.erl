@@ -26,8 +26,16 @@ allowed_methods(_Version, _Token, []) ->
 allowed_methods(_Version, _Token, [?UUID(_Org)]) ->
     [<<"GET">>, <<"PUT">>, <<"DELETE">>];
 
-allowed_methods(?V2, _Token, [?UUID(_Org), <<"accounting">>]) ->
+allowed_methods(_Version, _Token, [?UUID(_Org), <<"accounting">>]) ->
     [<<"GET">>];
+
+allowed_methods(_Version, _Token,
+                [?UUID(_Org), <<"docker">>, <<"networks">>, <<"public">>]) ->
+    [<<"PUT">>];
+
+allowed_methods(_Version, _Token,
+                [?UUID(_Org), <<"docker">>, <<"networks">>, <<"private">>]) ->
+    [<<"PUT">>];
 
 allowed_methods(_Version, _Token, [?UUID(_Org), <<"triggers">> | _Trigger]) ->
     [<<"POST">>, <<"DELETE">>];
@@ -107,6 +115,9 @@ permission_required(post, [?UUID(Org), <<"triggers">> | _],
 permission_required(delete, [?UUID(Org), <<"triggers">> | _], _) ->
     {ok, [<<"orgs">>, Org, <<"edit">>]};
 
+permission_required(put, [?UUID(Org), <<"docker">>, <<"networks">>, _Net], _) ->
+    {ok, [<<"orgs">>, Org, <<"edit">>]};
+
 permission_required(put, [?UUID(Org), <<"metadata">> | _], _) ->
     {ok, [<<"orgs">>, Org, <<"edit">>]};
 
@@ -129,6 +140,10 @@ permission_required(_Method, _Path, _State) ->
 %% Change resources
 schema(#state{method = <<"PUT">>, path = [?UUID(_Org), <<"resources">>, _]}) ->
     org_resource_change;
+
+schema(#state{method = <<"PUT">>, path = [?UUID(_Org), <<"docker">>,
+                                          <<"networks">>, _]}) ->
+    org_docker_set_net;
 
 schema(_State) ->
     none.
@@ -178,7 +193,7 @@ acc_to_js({Timestamp, Action, Resource, Metadata}) ->
     ].
 
 %%--------------------------------------------------------------------
-%% PUT
+%% POST
 %%--------------------------------------------------------------------
 
 create(Req, State = #state{path = [], version = Version}, Decoded) ->
@@ -205,8 +220,25 @@ create(Req, State =
     {{true, <<"/api/", Version/binary, "/orgs/", Org/binary>>},
      Req, State}.
 
-write(Req, State = #state{path = [?UUID(Org), <<"metadata">> | Path]}, [{K, V}])
-  when is_binary(Org) ->
+%%--------------------------------------------------------------------
+%% PUT
+%%--------------------------------------------------------------------
+
+
+write(Req, State =
+          #state{path = [?UUID(Org), <<"docker">>, <<"networks">>, Scope]},
+      [{<<"network">>, Net}]) ->
+    {ok, _} = ls_network:get(Net),
+    K = [<<"fifo">>, <<"docker">>, <<"networks">>, Scope],
+    Start = erlang:system_time(micro_seconds),
+    ok = ls_org:set_metadata(Org, [{K, Net}]),
+    e2qc:evict(?CACHE, Org),
+    e2qc:teardown(?FULL_CACHE),
+    ?MSnarl(?P(State), Start),
+    {true, Req, State};
+
+write(Req,
+      State = #state{path = [?UUID(Org), <<"metadata">> | Path]}, [{K, V}]) ->
     Start = erlang:system_time(micro_seconds),
     ls_org:set_metadata(Org, [{[<<"public">> | Path] ++ [K],
                                jsxd:from_list(V)}]),
