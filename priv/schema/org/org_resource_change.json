@@ -1,6 +1,6 @@
 {
   "$schema": "http://json-schema.org/draft-03/schema#",
-  "description": "Create a PAckage",
+  "description": "Give or remove resources form an org.",
   "oneOf": [
     {
       "type": "object",
