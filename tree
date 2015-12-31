@@ -32,11 +32,11 @@
    ├─ lager─3.0.1
    │  └─ goldrush─0.1.7
    ├─ libchunter─0.1.42
-   ├─ libsnarl─0.3.36
-   │  └─ mdns_client_lib─0.1.30
+   ├─ libsnarl─0.3.37
+   │  └─ mdns_client_lib─0.1.31
    │     ├─ mdns_client─0.1.7
    │     └─ pooler─1.4.0
-   ├─ libsniffle─0.3.33
+   ├─ libsniffle─0.3.34
    ├─ meck─0.8.2
    ├─ msgpack─0.3.3
    └─ uuid─0.4.7
