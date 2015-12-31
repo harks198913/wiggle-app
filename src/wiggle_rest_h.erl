@@ -251,13 +251,13 @@ forbidden(Req, State = #state{method_a = Method, path = Path, module = M}) ->
 
 
 read_raw(Req, State) ->
-    read(Req, raw, State).
+    read(Req, raw, State#state{encoding = raw}).
 
 read_json(Req, State) ->
-    read(Req, json, State).
+    read(Req, json, State#state{encoding = json}).
 
 read_msgpack(Req, State) ->
-    read(Req, msgpack, State).
+    read(Req, msgpack, State#state{encoding = msgpack}).
 
 read(Req, raw, State = #state{module = M}) ->
     case M:read(Req, State) of
@@ -292,12 +292,12 @@ write_raw(Req, State) ->
     write(Req, raw, State).
 
 write_json(Req, State) ->
-    write(Req, json, State).
+    write(Req, json, State#state{encoding = json}).
 
 write_msgpack(Req, State) ->
-    write(Req, msgpack, State).
+    write(Req, msgpack, State#state{encoding = msgpack}).
 
-write(Req, raw, State = #state{ body = undefined}) ->
+write(Req, raw, State = #state{encoding = raw, body = undefined}) ->
     write2(Req, State);
 
 write(Req, ContentType, State = #state{body = undefined}) ->

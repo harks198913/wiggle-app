@@ -98,6 +98,38 @@ permission_required(_Method, _Path) ->
 %% GET
 %%--------------------------------------------------------------------
 
+join_elements(Filter, Gs) ->
+    << <<",", (jsx:encode(jsxd:select(Filter, ft_grouping:to_json(G))))/binary>>
+      || {_, G} <- Gs>>.
+
+stream_elements(Send, Filter, Permission) ->
+    FoldFn =
+        fun({data, [{_, H} | T]}, first) ->
+                H1 = jsx:encode(jsxd:select(Filter, ft_grouping:to_json(H))),
+                Send(<<"[", H1/binary, (join_elements(Filter, T))/binary>>),
+                ok;
+           ({data, Gs}, _) ->
+                Send(join_elements(Filter, Gs)),
+                ok;
+           (done, _) ->
+                Send(<<"]">>),
+                ok
+        end,
+    ls_grouping:stream(Permission, FoldFn, []),
+    ok.
+
+read(Req, State = #state{token = Token, path = [], full_list=true,
+                         full_list_fields=Filter, encoding = json}) ->
+    {ok, Permissions} = wiggle_h:get_permissions(Token),
+    Permission = [{must, 'allowed',
+                   [<<"groupings">>, {<<"res">>, <<"uuid">>}, <<"get">>],
+                   Permissions}],
+    StreamFn =
+        fun(SendChunk) ->
+                stream_elements(SendChunk, Filter, Permission)
+        end,
+    {{chunked, StreamFn}, Req, State};
+
 read(Req, State = #state{token = Token, path = [], full_list=true,
                          full_list_fields=Filter}) ->
     Start = erlang:system_time(micro_seconds),

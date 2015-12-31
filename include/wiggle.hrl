@@ -25,6 +25,7 @@
           bearer,
           %% A cached set of permissons
           cached_perms,
+          encoding,
           %% The permissions granted by the OAuth2 scope.
           %% If we don't have a scope aka don't use oatuh2 we always allow
           %% everything from a scope pov.
