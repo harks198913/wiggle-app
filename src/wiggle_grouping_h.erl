@@ -112,10 +112,10 @@ stream_elements(Send, Filter, Permission) ->
                 Send(join_elements(Filter, Gs)),
                 ok;
            (done, _) ->
-                Send(<<"]">>),
                 ok
         end,
     ls_grouping:stream(Permission, FoldFn, first),
+    Send(<<"]">>),
     ok.
 
 read(Req, State = #state{token = Token, path = [], full_list=true,
