@@ -98,7 +98,7 @@ permission_required(_Method, _Path) ->
 %% GET
 %%--------------------------------------------------------------------
 
-read(Req, State = #state{token = Token, path = [], full_list=FullList,
+read(Req, State = #state{token = Token, path = [], full_list=true,
                          full_list_fields=Filter}) ->
     Start = erlang:system_time(micro_seconds),
     {ok, Permissions} = wiggle_h:get_permissions(Token),
@@ -107,10 +107,31 @@ read(Req, State = #state{token = Token, path = [], full_list=FullList,
     Permission = [{must, 'allowed',
                    [<<"groupings">>, {<<"res">>, <<"uuid">>}, <<"get">>],
                    Permissions}],
-    Res = wiggle_h:list(fun ls_grouping:list/2,
-                        fun ft_grouping:to_json/1, Token, Permission,
-                        FullList, Filter, grouping_list_ttl, ?FULL_CACHE,
-                        ?LIST_CACHE),
+    FoldFn = fun(Groupings, Acc) ->
+                     [jsxd:select(Filter, ft_grouping:to_json(G)) ||
+                         {_, G} <- Groupings] ++ Acc
+             end,
+    {ok, Res} = ls_grouping:stream(Permission, FoldFn, []),
+    %% Res = wiggle_h:list(fun ls_grouping:list/2,
+    %%                     fun ft_grouping:to_json/1, Token, Permission,
+    %%                     FullList, Filter, grouping_list_ttl, ?FULL_CACHE,
+    %%                     ?LIST_CACHE),
+    ?MSniffle(?P(State), Start1),
+    {Res, Req, State};
+
+read(Req, State = #state{token = Token, path = [], full_list=false}) ->
+    Start = erlang:system_time(micro_seconds),
+    {ok, Permissions} = wiggle_h:get_permissions(Token),
+    ?MSnarl(?P(State), Start),
+    Start1 = erlang:system_time(micro_seconds),
+    Permission = [{must, 'allowed',
+                   [<<"groupings">>, {<<"res">>, <<"uuid">>}, <<"get">>],
+                   Permissions}],
+    FoldFn = fun(Groupings, Acc) ->
+                     [ft_grouping:uuid(G) ||
+                         {_, G} <- Groupings] ++ Acc
+             end,
+    {ok, Res} = ls_grouping:stream(Permission, FoldFn, []),
     ?MSniffle(?P(State), Start1),
     {Res, Req, State};
 
