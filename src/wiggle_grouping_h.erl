@@ -111,7 +111,7 @@ read(Req, State = #state{token = Token, path = [], full_list=true,
                      [jsxd:select(Filter, ft_grouping:to_json(G)) ||
                          {_, G} <- Groupings] ++ Acc;
                 (done, Acc) ->
-                     Acc
+                     {ok, Acc}
              end,
     {ok, Res} = ls_grouping:stream(Permission, FoldFn, []),
     %% Res = wiggle_h:list(fun ls_grouping:list/2,
@@ -129,9 +129,11 @@ read(Req, State = #state{token = Token, path = [], full_list=false}) ->
     Permission = [{must, 'allowed',
                    [<<"groupings">>, {<<"res">>, <<"uuid">>}, <<"get">>],
                    Permissions}],
-    FoldFn = fun(Groupings, Acc) ->
+    FoldFn = fun({data, Groupings}, Acc) ->
                      [ft_grouping:uuid(G) ||
-                         {_, G} <- Groupings] ++ Acc
+                         {_, G} <- Groupings] ++ Acc;
+                (done, Acc) ->
+                     {ok, Acc}
              end,
     {ok, Res} = ls_grouping:stream(Permission, FoldFn, []),
     ?MSniffle(?P(State), Start1),
