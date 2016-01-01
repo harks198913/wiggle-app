@@ -94,22 +94,12 @@ permission_required(_Method, _Path) ->
 %%--------------------------------------------------------------------
 %% GET
 %%--------------------------------------------------------------------
-
-read(Req, State = #state{token = Token, path = [], full_list=FullList,
-                         full_list_fields=Filter}) ->
-    Start = erlang:system_time(micro_seconds),
-    {ok, Permissions} = wiggle_h:get_permissions(Token),
-    ?MSnarl(?P(State), Start),
-    Start1 = erlang:system_time(micro_seconds),
-    Permission = [{must, 'allowed',
-                   [<<"hypervisors">>, {<<"res">>, <<"uuid">>}, <<"get">>],
-                   Permissions}],
-    Res = wiggle_h:list(fun ls_hypervisor:list/2,
-                        fun ft_hypervisor:to_json/1, Token, Permission,
-                        FullList, Filter, hypervisor_list_ttl, ?FULL_CACHE,
-                        ?LIST_CACHE),
-    ?MSniffle(?P(State), Start1),
-    {Res, Req, State};
+read(Req, State = #state{path = []}) ->
+    wiggle_h:list(<<"hypervisors">>,
+                  fun ls_hypervisor:stream/3,
+                  fun ft_hypervisor:uuid/1,
+                  fun ft_hypervisor:to_json/1,
+                  Req, State);
 
 read(Req, State = #state{path = [?UUID(_Hypervisor), <<"services">>, Service],
                          obj = Obj}) ->

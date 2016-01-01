@@ -83,21 +83,12 @@ schema(_State) ->
 %% GET
 %%--------------------------------------------------------------------
 
-read(Req, State = #state{token = Token, path = [], full_list=FullList,
-                         full_list_fields=Filter}) ->
-    Start = erlang:system_time(micro_seconds),
-    {ok, Permissions} = wiggle_h:get_permissions(Token),
-    ?MSnarl(?P(State), Start),
-    Start1 = erlang:system_time(micro_seconds),
-    Permission = [{must, 'allowed',
-                   [<<"packages">>, {<<"res">>, <<"uuid">>}, <<"get">>],
-                   Permissions}],
-    Res = wiggle_h:list(fun ls_package:list/2,
-                        fun ft_package:to_json/1, Token, Permission,
-                        FullList, Filter, package_list_ttl, ?FULL_CACHE,
-                        ?LIST_CACHE),
-    ?MSniffle(?P(State), Start1),
-    {Res, Req, State};
+read(Req, State = #state{path = []}) ->
+    wiggle_h:list(<<"packages">>,
+                  fun ls_package:stream/3,
+                  fun ft_package:uuid/1,
+                  fun ft_package:to_json/1,
+                  Req, State);
 
 read(Req, State = #state{path = [?UUID(_Package)], obj = Obj}) ->
     {ft_package:to_json(Obj), Req, State}.

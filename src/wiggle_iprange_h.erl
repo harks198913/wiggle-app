@@ -77,43 +77,12 @@ permission_required(_Method, _Path) ->
 %% GET
 %%--------------------------------------------------------------------
 
-read(Req, State = #state{token = Token, path = [], full_list=FullList,
-                         full_list_fields=Filter}) ->
-    Start = erlang:system_time(micro_seconds),
-    {ok, Permissions} = wiggle_h:get_permissions(Token),
-    ?MSnarl(?P(State), Start),
-    Start1 = erlang:system_time(micro_seconds),
-    Permission = [{must, 'allowed',
-                   [<<"ipranges">>, {<<"res">>, <<"uuid">>}, <<"get">>],
-                   Permissions}],
-    %% We can't use the wiggle_h:list_fn/4 since we need to
-    %% apply a transformation to the objects when full list is given.
-    Fun = fun() ->
-                  {ok, Res} = ls_iprange:list(Permission, FullList),
-                  case {Filter, FullList} of
-                      {_, false} ->
-                          [ID || {_, ID} <- Res];
-                      {[], _} ->
-                          [to_json(Obj) || {_, Obj} <- Res];
-                      _ ->
-                          [jsxd:select(Filter, to_json(Obj)) || {_, Obj} <- Res]
-                  end
-          end,
-    Res1 = case application:get_env(wiggle, iprange_list_ttl) of
-               {ok, {TTL1, TTL2}} ->
-                   case FullList of
-                       true ->
-                           wiggle_h:timeout_cache(
-                             ?FULL_CACHE, {Token, Filter}, TTL1, TTL2, Fun);
-                       _ ->
-                           wiggle_h:timeout_cache(
-                             ?LIST_CACHE, Token, TTL1, TTL2, Fun)
-                   end;
-               _ ->
-                   Fun()
-           end,
-    ?MSnarl(?P(State), Start1),
-    {Res1, Req, State};
+read(Req, State = #state{path = []}) ->
+    wiggle_h:list(<<"ipranges">>,
+                  fun ls_iprange:stream/3,
+                  fun ft_iprange:uuid/1,
+                  fun to_json/1,
+                  Req, State);
 
 read(Req, State = #state{path = [?UUID(_Iprange)], obj = Obj}) ->
     {to_json(Obj), Req, State}.

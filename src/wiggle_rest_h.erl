@@ -275,6 +275,13 @@ read(Req, MediaType, State = #state{module = M}) ->
     case M:read(Req, State) of
         {halt, _Req, _State} = Reply ->
             Reply;
+        {{stream, Permission, StreamFn, ToJsonFn}, Req, State} ->
+            SendFn =
+                fun(Socket, Transport) ->
+                        stream_elements(Socket, Transport, StreamFn, ToJsonFn,
+                                        Permission)
+                end,
+            {{stream, SendFn}, Req, State};
         {{chunked, _StreamFun}, _Req, _State} = Reply ->
             Reply;
         {Reply, Req1, State1} ->
@@ -283,6 +290,29 @@ read(Req, MediaType, State = #state{module = M}) ->
             ?MEx(?P(State), <<"encode">>, Start),
             {Data, Req2, State1#state{obj = Data}}
     end.
+
+
+join_elements(ToJsonFn, Gs) ->
+    << <<",", (jsx:encode(ToJsonFn(G)))/binary>>
+      || {_, G} <- Gs>>.
+
+stream_elements(Socket, Transport, StreamFn, ToJsonFn, Permission) ->
+    FoldFn =
+        fun({data, [{_, H} | T]}, first) ->
+                H1 = jsx:encode(ToJsonFn(H)),
+                Data =  [$[, H1, join_elements(ToJsonFn, T)],
+                Transport:send(Socket, Data),
+                ok;
+           ({data, Gs}, Acc) ->
+                Transport:send(Socket, join_elements(ToJsonFn, Gs)),
+                Acc;
+           (done, _) ->
+                Transport:send(Socket, "]"),
+                ok
+        end,
+    StreamFn(Permission, FoldFn, first),
+    ok.
+
 
 %%--------------------------------------------------------------------
 %% write

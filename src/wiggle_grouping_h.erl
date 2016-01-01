@@ -98,78 +98,12 @@ permission_required(_Method, _Path) ->
 %% GET
 %%--------------------------------------------------------------------
 
-join_elements(Filter, Gs) ->
-    << <<",", (jsx:encode(jsxd:select(Filter, ft_grouping:to_json(G))))/binary>>
-      || {_, G} <- Gs>>.
-
-stream_elements(Send, Filter, Permission) ->
-    FoldFn =
-        fun({data, [{_, H} | T]}, first) ->
-                H1 = jsx:encode(jsxd:select(Filter, ft_grouping:to_json(H))),
-                Send(<<"[", H1/binary, (join_elements(Filter, T))/binary>>),
-                ok;
-           ({data, Gs}, _) ->
-                Send(join_elements(Filter, Gs)),
-                ok;
-           (done, _) ->
-                ok
-        end,
-    ls_grouping:stream(Permission, FoldFn, first),
-    Send(<<"]">>),
-    ok.
-
-read(Req, State = #state{token = Token, path = [], full_list=true,
-                         full_list_fields=Filter, encoding = json}) ->
-    {ok, Permissions} = wiggle_h:get_permissions(Token),
-    Permission = [{must, 'allowed',
-                   [<<"groupings">>, {<<"res">>, <<"uuid">>}, <<"get">>],
-                   Permissions}],
-    StreamFn =
-        fun(SendChunk) ->
-                stream_elements(SendChunk, Filter, Permission)
-        end,
-    {{chunked, StreamFn}, Req, State};
-
-read(Req, State = #state{token = Token, path = [], full_list=true,
-                         full_list_fields=Filter}) ->
-    Start = erlang:system_time(micro_seconds),
-    {ok, Permissions} = wiggle_h:get_permissions(Token),
-    ?MSnarl(?P(State), Start),
-    Start1 = erlang:system_time(micro_seconds),
-    Permission = [{must, 'allowed',
-                   [<<"groupings">>, {<<"res">>, <<"uuid">>}, <<"get">>],
-                   Permissions}],
-    FoldFn = fun({data, Groupings}, Acc) ->
-                     [jsxd:select(Filter, ft_grouping:to_json(G)) ||
-                         {_, G} <- Groupings] ++ Acc;
-                (done, Acc) ->
-                     {ok, Acc}
-             end,
-    {ok, Res} = ls_grouping:stream(Permission, FoldFn, []),
-    %% Res = wiggle_h:list(fun ls_grouping:list/2,
-    %%                     fun ft_grouping:to_json/1, Token, Permission,
-    %%                     FullList, Filter, grouping_list_ttl, ?FULL_CACHE,
-    %%                     ?LIST_CACHE),
-    ?MSniffle(?P(State), Start1),
-    {Res, Req, State};
-
-read(Req, State = #state{token = Token, path = [], full_list=false}) ->
-    Start = erlang:system_time(micro_seconds),
-    {ok, Permissions} = wiggle_h:get_permissions(Token),
-    ?MSnarl(?P(State), Start),
-    Start1 = erlang:system_time(micro_seconds),
-    Permission = [{must, 'allowed',
-                   [<<"groupings">>, {<<"res">>, <<"uuid">>}, <<"get">>],
-                   Permissions}],
-    FoldFn = fun({data, Groupings}, Acc) ->
-                     [ft_grouping:uuid(G) ||
-                         {_, G} <- Groupings] ++ Acc;
-                (done, Acc) ->
-                     {ok, Acc}
-             end,
-    {ok, Res} = ls_grouping:stream(Permission, FoldFn, []),
-    ?MSniffle(?P(State), Start1),
-    {Res, Req, State};
+read(Req, State = #state{path = []}) ->
+    wiggle_h:list(<<"groupings">>,
+                  fun ls_grouping:stream/3,
+                  fun ft_grouping:uuid/1,
+                  fun ft_grouping:to_json/1,
+                  Req, State);
 
 read(Req, State = #state{path = [?UUID(_Grouping)], obj = Obj}) ->
     {ft_grouping:to_json(Obj), Req, State}.

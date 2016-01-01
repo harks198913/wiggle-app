@@ -16,8 +16,8 @@
          get_permissions/1,
          clear_permissions/1,
          timeout_cache_with_invalid/6,
-         timeout_cache/5,
          list/9,
+         list/6,
          allowed/2,
          get_ws_token/1
         ]).
@@ -361,4 +361,35 @@ verify_bearer(Bearer, Req)->
             end;
         _ ->
             {denied, Req}
+    end.
+
+
+list(Perm, StreamFn, UUIDFn, ToJsonFn, Req,
+     State = #state{token = Token, full_list=FullList,
+                    full_list_fields=Filter, encoding = Encoding}) ->
+    {ok, Permissions} = get_permissions(Token),
+    Permission = [{must, 'allowed',
+                   [Perm, {<<"res">>, <<"uuid">>}, <<"get">>],
+                   Permissions}],
+    ConvertFn = case {FullList, Filter} of
+                    {true, []} ->
+                        ToJsonFn;
+                    {true, _} ->
+                        fun(G) ->
+                                jsxd:select(Filter, ToJsonFn(G))
+                        end;
+                    {false, _} ->
+                        UUIDFn
+                end,
+    case Encoding of
+        json ->
+            {{stream, Permission, StreamFn, ConvertFn}, Req, State};
+        _ ->
+            FoldFn = fun({data, Vms}, Acc) ->
+                             [ConvertFn(G) || {_, G} <- Vms] ++ Acc;
+                        (done, Acc) ->
+                             {ok, Acc}
+                     end,
+            {ok, Res} = StreamFn(Permission, FoldFn, []),
+            {Res, Req, State}
     end.

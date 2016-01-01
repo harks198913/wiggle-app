@@ -116,22 +116,12 @@ content_types_provided(_) ->
 %% GET
 %%--------------------------------------------------------------------
 
-read(Req, State = #state{token = Token, path = [], full_list=FullList,
-                         full_list_fields=Filter}) ->
-    Start = erlang:system_time(micro_seconds),
-    {ok, Permissions} = wiggle_h:get_permissions(Token),
-    ?MSnarl(?P(State), Start),
-    Start1 = erlang:system_time(micro_seconds),
-    Permission = [{must, 'allowed',
-                   [<<"datasets">>, {<<"res">>, <<"uuid">>}, <<"get">>],
-                   Permissions}],
-    Res = wiggle_h:list(fun ls_dataset:list/2,
-                        fun ft_dataset:to_json/1, Token, Permission,
-                        FullList, Filter, dataset_list_ttl, ?FULL_CACHE,
-                        ?LIST_CACHE),
-
-    ?MSniffle(?P(State), Start1),
-    {Res, Req, State};
+read(Req, State = #state{path = []}) ->
+    wiggle_h:list(<<"datasets">>,
+                  fun ls_dataset:stream/3,
+                  fun ft_dataset:uuid/1,
+                  fun ft_dataset:to_json/1,
+                  Req, State);
 
 read(Req, State = #state{path = [?UUID(_Dataset)], obj = Obj}) ->
     {ft_dataset:to_json(Obj), Req, State};
